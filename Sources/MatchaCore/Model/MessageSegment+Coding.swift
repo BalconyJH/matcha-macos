@@ -6,7 +6,7 @@ import Foundation
 /// format — it has to stay readable and stable as cases are added. So each segment
 /// encodes as a flat object with a `type` discriminator, which is also what makes
 /// the raw-content inspector legible.
-public extension MessageSegment {
+extension MessageSegment {
     private enum CodingKeys: String, CodingKey {
         case type
         case text
@@ -25,7 +25,7 @@ public extension MessageSegment {
         case text, mention, face, image, record, video, file, reply, poke, forward, unsupported
     }
 
-    init(from decoder: any Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let rawType = try container.decode(String.self, forKey: .type)
 
@@ -73,43 +73,43 @@ public extension MessageSegment {
         }
     }
 
-    func encode(to encoder: any Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case let .text(text):
+        case .text(let text):
             try container.encode(Kind.text, forKey: .type)
             try container.encode(text, forKey: .text)
-        case let .mention(userID):
+        case .mention(let userID):
             try container.encode(Kind.mention, forKey: .type)
             try container.encodeIfPresent(userID, forKey: .userID)
-        case let .face(id, name):
+        case .face(let id, let name):
             try container.encode(Kind.face, forKey: .type)
             try container.encode(id, forKey: .id)
             try container.encodeIfPresent(name, forKey: .name)
-        case let .image(asset):
+        case .image(let asset):
             try container.encode(Kind.image, forKey: .type)
             try container.encode(asset, forKey: .asset)
-        case let .record(asset, duration):
+        case .record(let asset, let duration):
             try container.encode(Kind.record, forKey: .type)
             try container.encode(asset, forKey: .asset)
             try container.encodeIfPresent(duration, forKey: .duration)
-        case let .video(asset):
+        case .video(let asset):
             try container.encode(Kind.video, forKey: .type)
             try container.encode(asset, forKey: .asset)
-        case let .file(asset):
+        case .file(let asset):
             try container.encode(Kind.file, forKey: .type)
             try container.encode(asset, forKey: .asset)
-        case let .reply(messageID):
+        case .reply(let messageID):
             try container.encode(Kind.reply, forKey: .type)
             try container.encode(messageID, forKey: .messageID)
-        case let .poke(userID):
+        case .poke(let userID):
             try container.encode(Kind.poke, forKey: .type)
             try container.encodeIfPresent(userID, forKey: .userID)
-        case let .forward(id, nodes):
+        case .forward(let id, let nodes):
             try container.encode(Kind.forward, forKey: .type)
             try container.encode(id, forKey: .id)
             try container.encode(nodes, forKey: .nodes)
-        case let .unsupported(type, payload):
+        case .unsupported(let type, let payload):
             try container.encode(Kind.unsupported, forKey: .type)
             try container.encode(type, forKey: .originalType)
             try container.encode(payload, forKey: .payload)
@@ -119,12 +119,12 @@ public extension MessageSegment {
 
 /// Flat `{kind, value}` encoding for an asset's origin, so the stored form does
 /// not depend on Swift's synthesized enum layout.
-public extension Asset.Source {
+extension Asset.Source {
     private enum CodingKeys: String, CodingKey {
         case kind, value
     }
 
-    init(from decoder: any Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let kind = try container.decode(String.self, forKey: .kind)
         let value = try container.decodeIfPresent(String.self, forKey: .value) ?? ""
@@ -135,13 +135,13 @@ public extension Asset.Source {
         }
     }
 
-    func encode(to encoder: any Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case let .local(path):
+        case .local(let path):
             try container.encode("local", forKey: .kind)
             try container.encode(path, forKey: .value)
-        case let .remote(url):
+        case .remote(let url):
             try container.encode("remote", forKey: .kind)
             try container.encode(url, forKey: .value)
         case .inline:

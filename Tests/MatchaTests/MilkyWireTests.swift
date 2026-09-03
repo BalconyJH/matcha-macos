@@ -1,8 +1,7 @@
 import Foundation
-import Testing
-
 import MatchaCore
 import MatchaProtocol
+import Testing
 
 // The segment coder and event encoder are internal to the module, so the wire-level
 // assertions reach them through a testable import.
@@ -44,7 +43,7 @@ private func isNumber(_ value: JSONValue?) -> Bool {
 }
 
 private func isIntegerNumber(_ value: JSONValue?) -> Bool {
-    guard case let .some(.number(number)) = value else { return false }
+    guard case .some(.number(let number)) = value else { return false }
     return number.isFinite && number.rounded(.towardZero) == number
 }
 
@@ -271,9 +270,9 @@ struct MilkyWireTests {
 
         // Outgoing: a single uri, which the resolver ingests.
         let outgoing = await coder.decodeOutgoing([
-            ["type": "image", "data": ["uri": "https://example.com/cat.png"]],
+            ["type": "image", "data": ["uri": "https://example.com/cat.png"]]
         ])
-        guard case let .image(ingested) = outgoing.first else {
+        guard case .image(let ingested) = outgoing.first else {
             Issue.record("Expected an image segment to decode")
             return
         }
@@ -502,7 +501,7 @@ struct MilkyWireTests {
                 senderName: "Alice nested",
                 time: Date(timeIntervalSince1970: 1_700_000_300),
                 content: [.text("Nested hello")]
-            ),
+            )
         ]
         let forwardID = "persisted-forward"
         let nodes = [

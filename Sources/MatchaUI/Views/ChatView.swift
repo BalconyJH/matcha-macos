@@ -20,58 +20,59 @@ struct ChatView: View {
                         senderID: draftKey.senderID,
                         draft: draftBinding(for: draftKey)
                     )
-                        .id(draftKey)
-                        .frame(maxWidth: 900)
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 14)
-            }
-            .navigationTitle(title(for: chat))
-            .navigationSubtitle(subtitle(for: chat))
-            .toolbar {
-                if chat.scene == .group {
-                    ToolbarItem {
-                        Button {
-                            showingGroupMembers = true
-                        } label: {
-                            Label("Group Members", systemImage: "person.3")
+                    .id(draftKey)
+                    .frame(maxWidth: 900)
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 14)
+                }
+                .navigationTitle(title(for: chat))
+                .navigationSubtitle(subtitle(for: chat))
+                .toolbar {
+                    if chat.scene == .group {
+                        ToolbarItem {
+                            Button {
+                                showingGroupMembers = true
+                            } label: {
+                                Label("Group Members", systemImage: "person.3")
+                            }
+                            .help("Manage group members")
                         }
-                        .help("Manage group members")
                     }
                 }
-            }
-            .sheet(isPresented: $showingGroupMembers) {
-                GroupMembersSheet(environment: environment, groupID: chat.peerID)
-            }
-            .confirmationDialog(
-                pendingHistoryClear.map { "Clear all messages in \($0.title)?" }
-                    ?? "Clear Chat History?",
-                isPresented: historyClearConfirmationPresented,
-                titleVisibility: .visible
-            ) {
-                Button("Clear Chat History", role: .destructive) {
-                    guard let request = pendingHistoryClear else { return }
-                    pendingHistoryClear = nil
-                    Task { await clearHistory(request.chat) }
+                .sheet(isPresented: $showingGroupMembers) {
+                    GroupMembersSheet(environment: environment, groupID: chat.peerID)
                 }
-                Button("Cancel", role: .cancel) {
-                    pendingHistoryClear = nil
+                .confirmationDialog(
+                    pendingHistoryClear.map { "Clear all messages in \($0.title)?" }
+                        ?? "Clear Chat History?",
+                    isPresented: historyClearConfirmationPresented,
+                    titleVisibility: .visible
+                ) {
+                    Button("Clear Chat History", role: .destructive) {
+                        guard let request = pendingHistoryClear else { return }
+                        pendingHistoryClear = nil
+                        Task { await clearHistory(request.chat) }
+                    }
+                    Button("Cancel", role: .cancel) {
+                        pendingHistoryClear = nil
+                    }
+                } message: {
+                    Text(
+                        "This permanently deletes every message saved in this conversation. "
+                            + "The friend or group chat will not be deleted."
+                    )
                 }
-            } message: {
-                Text(
-                    "This permanently deletes every message saved in this conversation. "
-                        + "The friend or group chat will not be deleted."
-                )
-            }
-            .alert("Unable to Clear Chat History", isPresented: historyClearErrorPresented) {
-                Button("OK") { historyClearError = nil }
-            } message: {
-                Text(historyClearError ?? "Unknown error")
-            }
+                .alert("Unable to Clear Chat History", isPresented: historyClearErrorPresented) {
+                    Button("OK") { historyClearError = nil }
+                } message: {
+                    Text(historyClearError ?? "Unknown error")
+                }
         } else {
             ContentUnavailableView(
                 "No Conversation Selected",
                 systemImage: "bubble.left.and.bubble.right",
-                description: Text("Select a conversation in the sidebar, or create a persona to start simulating a chat.")
+                description: Text(
+                    "Select a conversation in the sidebar, or create a persona to start simulating a chat.")
             )
         }
     }
@@ -82,7 +83,7 @@ struct ChatView: View {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     ForEach(environment.messages) { message in
                         MessageRow(message: message, chat: chat, environment: environment)
-                        .id(message.id)
+                            .id(message.id)
                     }
                 }
                 .frame(maxWidth: 920)
@@ -261,7 +262,7 @@ struct MessageRow: View {
 
     private var senderActionsAvailable: Bool {
         guard chat.scene == .group,
-              environment.botUserID == chat.selfID
+            environment.botUserID == chat.selfID
         else {
             return false
         }
@@ -349,39 +350,39 @@ struct SegmentView: View {
 
     var body: some View {
         switch segment {
-        case let .text(text):
+        case .text(let text):
             Text(text)
 
-        case let .mention(userID):
+        case .mention(let userID):
             Text(userID == nil ? "@everyone" : "@\(environment.displayName(for: userID!, in: chat))")
                 .foregroundStyle(.tint)
 
-        case let .face(_, name):
+        case .face(_, let name):
             Text(name.map { "[\($0)]" } ?? "[Emoji]")
                 .foregroundStyle(.secondary)
 
-        case let .image(asset):
+        case .image(let asset):
             ImageSegmentView(asset: asset)
 
-        case let .record(asset, duration):
+        case .record(let asset, let duration):
             attachment(icon: "waveform", label: durationLabel(asset: asset, duration: duration))
 
-        case let .video(asset):
+        case .video(let asset):
             attachment(icon: "film", label: asset.name)
 
-        case let .file(asset):
+        case .file(let asset):
             attachment(icon: "doc", label: "\(asset.name) · \(byteLabel(asset.byteCount))")
 
-        case let .reply(messageID):
+        case .reply(let messageID):
             QuotedMessageView(messageID: messageID, environment: environment, chat: chat)
 
         case .poke:
             attachment(icon: "hand.point.right", label: "Poke")
 
-        case let .forward(_, nodes):
+        case .forward(_, let nodes):
             ForwardSegmentView(nodes: nodes, environment: environment, chat: chat)
 
-        case let .unsupported(type, _):
+        case .unsupported(let type, _):
             attachment(icon: "questionmark.square.dashed", label: "Unsupported message segment: \(type)")
         }
     }
@@ -421,7 +422,7 @@ struct ImageSegmentView: View {
     }
 
     private var loadedImage: NSImage? {
-        if case let .local(path) = asset.source {
+        if case .local(let path) = asset.source {
             return NSImage(contentsOfFile: path)
         }
         return nil

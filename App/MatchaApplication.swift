@@ -21,12 +21,12 @@ struct MatchaApplication: App {
     var body: some Scene {
         Window("Matcha", id: "main") {
             switch launchState {
-            case let .ready(environment):
+            case .ready(let environment):
                 RootView(
                     environment: environment,
                     selectedSettingsTab: $selectedSettingsTab
                 )
-            case let .failed(failure):
+            case .failed(let failure):
                 StartupFailureView(failure: failure)
             }
         }
@@ -48,7 +48,7 @@ struct MatchaApplication: App {
 
         Settings {
             switch launchState {
-            case let .ready(environment):
+            case .ready(let environment):
                 SettingsView(
                     environment: environment,
                     selectedTab: $selectedSettingsTab
@@ -57,7 +57,8 @@ struct MatchaApplication: App {
                 ContentUnavailableView(
                     "Settings Unavailable",
                     systemImage: "exclamationmark.triangle",
-                    description: Text("The app environment could not be initialized, so settings cannot be read or saved.")
+                    description: Text(
+                        "The app environment could not be initialized, so settings cannot be read or saved.")
                 )
                 .frame(width: 460, height: 240)
             }
@@ -87,7 +88,8 @@ private struct StartupFailure {
     let diagnostic: String
 
     init(error: any Error) {
-        summary = "Matcha could not open its local data or asset directory. Make sure the Application Support directory is writable, then relaunch the app."
+        summary =
+            "Matcha could not open its local data or asset directory. Make sure the Application Support directory is writable, then relaunch the app."
         diagnostic = error.localizedDescription
     }
 }

@@ -180,7 +180,8 @@ extension AppLogRecord {
 
     var consoleLine: String {
         let timestampText = timestamp.formatted(date: .numeric, time: .standard)
-        return "\(timestampText) [\(levelDisplayLabel)] [\(categoryDisplayLabel)] \(eventIdentifier) — \(renderedMessage)"
+        return
+            "\(timestampText) [\(levelDisplayLabel)] [\(categoryDisplayLabel)] \(eventIdentifier) — \(renderedMessage)"
     }
 
     var prettyJSON: String {
@@ -192,12 +193,12 @@ extension AppLogRecord {
     }
 }
 
-private extension AppLogRecord {
-    var eventIdentifier: String {
+extension AppLogRecord {
+    fileprivate var eventIdentifier: String {
         event
     }
 
-    var levelSymbolName: String {
+    fileprivate var levelSymbolName: String {
         switch levelToken {
         case "trace": return "point.3.filled.connected.trianglepath.dotted"
         case "debug": return "ladybug"
@@ -207,7 +208,7 @@ private extension AppLogRecord {
         }
     }
 
-    var levelTint: Color {
+    fileprivate var levelTint: Color {
         switch levelToken {
         case "warning", "warn": return .orange
         case "error", "critical", "fault": return .red

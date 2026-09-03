@@ -56,7 +56,7 @@ public final class WebSocketConnection: @unchecked Sendable {
                 guard markReady() else { return }
                 onReady?(self)
                 receiveLoop()
-            case let .failed(error):
+            case .failed(let error):
                 finish(error: .connectFailed(error.localizedDescription))
                 connection.cancel()
             case .cancelled:
@@ -81,7 +81,8 @@ public final class WebSocketConnection: @unchecked Sendable {
             guard let self else { return }
 
             if let context,
-               let meta = context.protocolMetadata(definition: NWProtocolWebSocket.definition) as? NWProtocolWebSocket.Metadata
+                let meta = context.protocolMetadata(definition: NWProtocolWebSocket.definition)
+                    as? NWProtocolWebSocket.Metadata
             {
                 switch meta.opcode {
                 case .text:
@@ -264,7 +265,7 @@ public final class WebSocketConnection: @unchecked Sendable {
     /// Human-readable peer address, for the connection list in settings.
     public var peerDescription: String {
         switch connection.endpoint {
-        case let .hostPort(host, port):
+        case .hostPort(let host, let port):
             return "\(host):\(port)"
         default:
             return String(describing: connection.endpoint)

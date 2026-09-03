@@ -1,9 +1,10 @@
 import Foundation
 import MatchaCore
-@testable import MatchaLogging
 import MatchaProtocol
-@testable import MatchaUI
 import Testing
+
+@testable import MatchaLogging
+@testable import MatchaUI
 
 @Suite("Application Environment Logging", .serialized)
 @MainActor
@@ -106,8 +107,8 @@ private enum ExpectedOperationOutcome: String {
     case returnedError
 }
 
-private extension Array where Element == AppLogRecord {
-    func matching(
+extension Array where Element == AppLogRecord {
+    fileprivate func matching(
         _ operation: AppLogOperation,
         outcome: ExpectedOperationOutcome
     ) -> [AppLogRecord] {
@@ -117,7 +118,7 @@ private extension Array where Element == AppLogRecord {
         }
     }
 
-    var only: Element? {
+    fileprivate var only: Element? {
         count == 1 ? first : nil
     }
 }

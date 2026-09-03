@@ -1,9 +1,8 @@
 import Foundation
-import Testing
-
 import MatchaCore
 import MatchaMilky
 import MatchaProtocol
+import Testing
 
 /// Opt-in black-box coverage against a real nonebot-adapter-milky process.
 ///
@@ -125,7 +124,8 @@ struct MilkyLiveInteropTests {
         )
         let traffic = await session.trafficLog()
         let login = Task {
-            for await entry in traffic where
+            for await entry in traffic
+            where
                 entry.direction == .inboundCall && entry.summary == "get_login_info"
             {
                 return
@@ -165,7 +165,7 @@ struct MilkyLiveInteropTests {
         store: MatchaStore,
         senderID: User.ID
     ) async throws -> Message {
-        for _ in 0 ..< 500 {
+        for _ in 0..<500 {
             if let response = try await store.messages(in: chat).last(where: {
                 $0.senderID == senderID && $0.content.plainText == "live-milky-probe"
             }) {

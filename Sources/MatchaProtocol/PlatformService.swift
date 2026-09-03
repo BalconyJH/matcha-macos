@@ -223,12 +223,12 @@ public actor PlatformService {
         // In a group, admins may recall others' messages, but not an owner's or a
         // peer admin's.
         guard let actor = try await store.member(groupID: message.peerID, userID: operatorID),
-              actor.role > .member
+            actor.role > .member
         else {
             throw PlatformError.notPermitted("Administrator privileges are required to recall another user's message")
         }
         if let sender = try await store.member(groupID: message.peerID, userID: message.senderID),
-           sender.role >= actor.role
+            sender.role >= actor.role
         {
             throw PlatformError.notPermitted("Cannot recall a message from a member with an equal or higher role")
         }
@@ -253,27 +253,27 @@ public enum PlatformError: Error, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case let .userNotFound(id):
+        case .userNotFound(let id):
             return "User not found: \(id)"
-        case let .groupNotFound(id):
+        case .groupNotFound(let id):
             return "Group not found: \(id)"
-        case let .messageNotFound(id):
+        case .messageNotFound(let id):
             return "Message not found: \(id)"
-        case let .requestNotFound(id):
+        case .requestNotFound(let id):
             return "Request not found: \(id)"
-        case let .notAMember(groupID, userID):
+        case .notAMember(let groupID, let userID):
             return "User \(userID) is not a member of group \(groupID)"
-        case let .muted(until):
+        case .muted(let until):
             let formatter = DateFormatter()
             formatter.dateFormat = "HH:mm:ss"
             return "Muted until \(formatter.string(from: until))"
-        case let .wholeGroupMuted(groupID):
+        case .wholeGroupMuted(let groupID):
             return "Group \(groupID) has group-wide mute enabled"
-        case let .notPermitted(reason):
+        case .notPermitted(let reason):
             return reason
-        case let .invalidParameter(detail):
+        case .invalidParameter(let detail):
             return "Invalid parameter: \(detail)"
-        case let .alreadyExists(detail):
+        case .alreadyExists(let detail):
             return "Already exists: \(detail)"
         }
     }

@@ -89,8 +89,8 @@ struct AppKitComposerEditor: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView,
-                  parent.isEditable,
-                  parent.text != textView.string
+                parent.isEditable,
+                parent.text != textView.string
             else { return }
             parent.text = textView.string
         }

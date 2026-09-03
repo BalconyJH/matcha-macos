@@ -31,7 +31,9 @@ public struct HTTPResponse: Sendable {
     public var headers: [(name: String, value: String)]
     public var body: Data
 
-    public init(status: Int = 200, reason: String? = nil, headers: [(name: String, value: String)] = [], body: Data = Data()) {
+    public init(
+        status: Int = 200, reason: String? = nil, headers: [(name: String, value: String)] = [], body: Data = Data()
+    ) {
         self.status = status
         self.reason = reason ?? HTTPResponse.defaultReason(for: status)
         self.headers = headers
@@ -180,7 +182,7 @@ public final class HTTPServer: @unchecked Sendable {
             case .ready:
                 startup.resolve(.success(()))
                 self?.startupDidFinish(startup)
-            case let .failed(error):
+            case .failed(let error):
                 let failure = TransportError.listenFailed(
                     port: self?.port ?? 0,
                     underlying: error.localizedDescription
@@ -394,7 +396,8 @@ public final class HTTPServer: @unchecked Sendable {
 
         private func receive() {
             guard state == .http else { return }
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) {
+                [weak self] data, _, isComplete, error in
                 guard let self, state == .http else { return }
                 if let data, !data.isEmpty {
                     buffer.append(data)
@@ -421,18 +424,18 @@ public final class HTTPServer: @unchecked Sendable {
             switch Self.parse(buffer) {
             case .incomplete:
                 return
-            case let .reject(response):
+            case .reject(let response):
                 sendAndClose(response)
-            case let .request(request, consumed):
+            case .request(let request, let consumed):
                 buffer.removeFirst(consumed)
 
                 if request.headers["Upgrade"]?.lowercased() == "websocket",
-                   let webSocketUpgradeHandler
+                    let webSocketUpgradeHandler
                 {
                     switch webSocketUpgradeHandler(request) {
                     case .accept:
                         upgrade(request)
-                    case let .reject(response):
+                    case .reject(let response):
                         sendAndClose(response)
                     case .decline:
                         handle(request)
@@ -445,7 +448,8 @@ public final class HTTPServer: @unchecked Sendable {
 
         private func handle(_ request: HTTPRequest) {
             state = .handling
-            let requestWantsClose = request.headers["Connection"]?
+            let requestWantsClose =
+                request.headers["Connection"]?
                 .split(separator: ",")
                 .contains(where: { $0.trimmingCharacters(in: .whitespaces).lowercased() == "close" }) == true
 
@@ -589,7 +593,7 @@ public final class HTTPServer: @unchecked Sendable {
             guard data.distance(from: data.startIndex, to: headerEnd.lowerBound) <= HTTPServer.maxHeaderBytes else {
                 return .reject(.text("HTTP headers too large", status: 431))
             }
-            let headerData = data[data.startIndex ..< headerEnd.lowerBound]
+            let headerData = data[data.startIndex..<headerEnd.lowerBound]
             guard let headerText = String(data: headerData, encoding: .utf8) else {
                 return .reject(.text("HTTP headers are not valid UTF-8", status: 400))
             }
@@ -602,7 +606,7 @@ public final class HTTPServer: @unchecked Sendable {
 
             let parts = requestLine.split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count == 3,
-                  parts[2] == "HTTP/1.1" || parts[2] == "HTTP/1.0"
+                parts[2] == "HTTP/1.1" || parts[2] == "HTTP/1.0"
             else {
                 return .reject(.text("Invalid HTTP request line", status: 400))
             }
@@ -614,7 +618,7 @@ public final class HTTPServer: @unchecked Sendable {
                 guard let colon = line.firstIndex(of: ":"), colon != line.startIndex else {
                     return .reject(.text("Invalid HTTP header field", status: 400))
                 }
-                let name = String(line[line.startIndex ..< colon])
+                let name = String(line[line.startIndex..<colon])
                 let value = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
                 headers.add(name, value)
             }
@@ -626,12 +630,12 @@ public final class HTTPServer: @unchecked Sendable {
             let contentLengths = headers.values(for: "Content-Length")
             let parsedLengths = contentLengths.compactMap { raw -> Int? in
                 guard !raw.isEmpty,
-                      raw.utf8.allSatisfy({ (48 ... 57).contains($0) })
+                    raw.utf8.allSatisfy({ (48...57).contains($0) })
                 else { return nil }
                 return Int(raw)
             }
             guard parsedLengths.count == contentLengths.count,
-                  Set(parsedLengths).count <= 1
+                Set(parsedLengths).count <= 1
             else {
                 return .reject(.text("Invalid or conflicting Content-Length", status: 400))
             }
@@ -643,14 +647,14 @@ public final class HTTPServer: @unchecked Sendable {
             let available = data.distance(from: bodyStart, to: data.endIndex)
             guard available >= bodyLength else { return .incomplete }
 
-            let body = Data(data[bodyStart ..< data.index(bodyStart, offsetBy: bodyLength)])
+            let body = Data(data[bodyStart..<data.index(bodyStart, offsetBy: bodyLength)])
             let consumed = data.distance(from: data.startIndex, to: bodyStart) + bodyLength
 
             // Split the target into path and query.
             var path = target
             var query: [String: String] = [:]
             if let questionMark = target.firstIndex(of: "?") {
-                path = String(target[target.startIndex ..< questionMark])
+                path = String(target[target.startIndex..<questionMark])
                 let queryString = String(target[target.index(after: questionMark)...])
                 for pair in queryString.split(separator: "&") {
                     let kv = pair.split(separator: "=", maxSplits: 1)

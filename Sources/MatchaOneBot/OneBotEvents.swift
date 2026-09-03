@@ -25,25 +25,25 @@ struct OneBotEventEncoder: Sendable {
         let time = Int64(event.time.timeIntervalSince1970)
 
         switch event.payload {
-        case let .message(message):
+        case .message(let message):
             guard let payload = await encodeMessage(message, time: time) else { return [] }
             return [payload]
 
-        case let .messageRecalled(recall):
+        case .messageRecalled(let recall):
             guard let payload = encodeRecall(recall, time: time) else { return [] }
             return [payload]
 
-        case let .groupMemberAdded(change):
+        case .groupMemberAdded(let change):
             return [encodeMemberChange(change, time: time, joined: true)]
 
-        case let .groupMemberRemoved(change):
+        case .groupMemberRemoved(let change):
             return [encodeMemberChange(change, time: time, joined: false)]
 
-        case let .groupAdminChanged(change):
+        case .groupAdminChanged(let change):
             guard let payload = encodeAdminChange(change, time: time) else { return [] }
             return [payload]
 
-        case let .groupMuted(mute):
+        case .groupMuted(let mute):
             guard let payload = encodeMute(mute, time: time) else { return [] }
             return [payload]
 
@@ -51,25 +51,25 @@ struct OneBotEventEncoder: Sendable {
             // Neither version standardises a group-rename notice.
             return []
 
-        case let .friendAdded(userID):
+        case .friendAdded(let userID):
             guard version == .v12 else { return [] }
             return [
                 base(time: time, type: "notice", detailType: "friend_increase")
-                    .merging(["user_id": .string(userID)]),
+                    .merging(["user_id": .string(userID)])
             ]
 
-        case let .friendRemoved(userID):
+        case .friendRemoved(let userID):
             guard version == .v12 else { return [] }
             return [
                 base(time: time, type: "notice", detailType: "friend_decrease")
-                    .merging(["user_id": .string(userID)]),
+                    .merging(["user_id": .string(userID)])
             ]
 
-        case let .requestReceived(request):
+        case .requestReceived(let request):
             guard let payload = encodeRequest(request, time: time) else { return [] }
             return [payload]
 
-        case let .poke(poke):
+        case .poke(let poke):
             guard version == .v11 else { return [] }
             return [encodePoke(poke, time: time)]
 
@@ -77,7 +77,7 @@ struct OneBotEventEncoder: Sendable {
             // A v11 extension in practice, not in either standard.
             return []
 
-        case let .groupFileUploaded(upload):
+        case .groupFileUploaded(let upload):
             guard version == .v11 else { return [] }
             return [
                 base(time: time, type: "notice", detailType: "group_upload")
@@ -90,7 +90,7 @@ struct OneBotEventEncoder: Sendable {
                             "size": .number(Double(upload.asset.byteCount)),
                             "busid": 0,
                         ],
-                    ]),
+                    ])
             ]
 
         case .connected, .disconnected:
@@ -362,7 +362,7 @@ struct OneBotEventEncoder: Sendable {
 extension JSONValue {
     /// Adds members to an object, overwriting on conflict.
     func merging(_ members: [String: JSONValue]) -> JSONValue {
-        guard case let .object(existing) = self else { return .object(members) }
+        guard case .object(let existing) = self else { return .object(members) }
         return .object(existing.merging(members) { _, new in new })
     }
 }

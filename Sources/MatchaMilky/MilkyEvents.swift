@@ -21,14 +21,14 @@ struct MilkyEventEncoder: Sendable {
         let time = Int64(event.time.timeIntervalSince1970)
 
         switch event.payload {
-        case let .message(message):
+        case .message(let message):
             let segments = await segmentCoder.encodeIncoming(message.content)
             // `message_receive`'s data *is* the IncomingMessage, flat — there is no
             // second `data` level here.
             let body = await entityEncoder.incomingMessage(message, segments: segments)
             return [envelope(time: time, type: "message_receive", data: body)]
 
-        case let .messageRecalled(recall):
+        case .messageRecalled(let recall):
             // Milky addresses the recalled message by its per-chat sequence, so the
             // stored message has to be resolved to learn it.
             guard let stored = try? await entityEncoder.store.message(id: recall.messageID) else {
@@ -36,19 +36,21 @@ struct MilkyEventEncoder: Sendable {
             }
             let recalledSeq = stored.seq
             return [
-                envelope(time: time, type: "message_recall", data: [
-                    "message_scene": .string(recall.scene.rawValue),
-                    "peer_id": MilkyEntityEncoder.uin(recall.peerID),
-                    "message_seq": .number(Double(recalledSeq)),
-                    "sender_id": MilkyEntityEncoder.uin(recall.senderID),
-                    "operator_id": MilkyEntityEncoder.uin(recall.operatorID),
-                    "display_suffix": .string(
-                        recall.operatorID == recall.senderID ? "recalled a message" : "recalled a member's message"
-                    ),
-                ]),
+                envelope(
+                    time: time, type: "message_recall",
+                    data: [
+                        "message_scene": .string(recall.scene.rawValue),
+                        "peer_id": MilkyEntityEncoder.uin(recall.peerID),
+                        "message_seq": .number(Double(recalledSeq)),
+                        "sender_id": MilkyEntityEncoder.uin(recall.senderID),
+                        "operator_id": MilkyEntityEncoder.uin(recall.operatorID),
+                        "display_suffix": .string(
+                            recall.operatorID == recall.senderID ? "recalled a message" : "recalled a member's message"
+                        ),
+                    ])
             ]
 
-        case let .groupMemberAdded(change):
+        case .groupMemberAdded(let change):
             var data: [String: JSONValue] = [
                 "group_id": MilkyEntityEncoder.uin(change.groupID),
                 "user_id": MilkyEntityEncoder.uin(change.userID),
@@ -63,7 +65,7 @@ struct MilkyEventEncoder: Sendable {
             }
             return [envelope(time: time, type: "group_member_increase", data: .object(data))]
 
-        case let .groupMemberRemoved(change):
+        case .groupMemberRemoved(let change):
             var data: [String: JSONValue] = [
                 "group_id": MilkyEntityEncoder.uin(change.groupID),
                 "user_id": MilkyEntityEncoder.uin(change.userID),
@@ -73,101 +75,117 @@ struct MilkyEventEncoder: Sendable {
             }
             return [envelope(time: time, type: "group_member_decrease", data: .object(data))]
 
-        case let .groupAdminChanged(change):
+        case .groupAdminChanged(let change):
             return [
-                envelope(time: time, type: "group_admin_change", data: [
-                    "group_id": MilkyEntityEncoder.uin(change.groupID),
-                    "user_id": MilkyEntityEncoder.uin(change.userID),
-                    "operator_id": MilkyEntityEncoder.uin(change.operatorID),
-                    "is_set": .bool(change.granted),
-                ]),
+                envelope(
+                    time: time, type: "group_admin_change",
+                    data: [
+                        "group_id": MilkyEntityEncoder.uin(change.groupID),
+                        "user_id": MilkyEntityEncoder.uin(change.userID),
+                        "operator_id": MilkyEntityEncoder.uin(change.operatorID),
+                        "is_set": .bool(change.granted),
+                    ])
             ]
 
-        case let .groupMuted(mute):
+        case .groupMuted(let mute):
             // Milky separates per-member mutes from whole-group ones.
             if let userID = mute.userID {
                 return [
-                    envelope(time: time, type: "group_mute", data: [
-                        "group_id": MilkyEntityEncoder.uin(mute.groupID),
-                        "user_id": MilkyEntityEncoder.uin(userID),
-                        "operator_id": MilkyEntityEncoder.uin(mute.operatorID),
-                        "duration": MilkyEntityEncoder.seconds(max(mute.duration, 0)),
-                    ]),
+                    envelope(
+                        time: time, type: "group_mute",
+                        data: [
+                            "group_id": MilkyEntityEncoder.uin(mute.groupID),
+                            "user_id": MilkyEntityEncoder.uin(userID),
+                            "operator_id": MilkyEntityEncoder.uin(mute.operatorID),
+                            "duration": MilkyEntityEncoder.seconds(max(mute.duration, 0)),
+                        ])
                 ]
             }
             return [
-                envelope(time: time, type: "group_whole_mute", data: [
-                    "group_id": MilkyEntityEncoder.uin(mute.groupID),
-                    "operator_id": MilkyEntityEncoder.uin(mute.operatorID),
-                    "is_mute": .bool(mute.muted),
-                ]),
+                envelope(
+                    time: time, type: "group_whole_mute",
+                    data: [
+                        "group_id": MilkyEntityEncoder.uin(mute.groupID),
+                        "operator_id": MilkyEntityEncoder.uin(mute.operatorID),
+                        "is_mute": .bool(mute.muted),
+                    ])
             ]
 
-        case let .groupNameChanged(groupID, operatorID, name):
+        case .groupNameChanged(let groupID, let operatorID, let name):
             return [
-                envelope(time: time, type: "group_name_change", data: [
-                    "group_id": MilkyEntityEncoder.uin(groupID),
-                    "new_group_name": .string(name),
-                    "operator_id": MilkyEntityEncoder.uin(operatorID),
-                ]),
+                envelope(
+                    time: time, type: "group_name_change",
+                    data: [
+                        "group_id": MilkyEntityEncoder.uin(groupID),
+                        "new_group_name": .string(name),
+                        "operator_id": MilkyEntityEncoder.uin(operatorID),
+                    ])
             ]
 
         case .friendAdded, .friendRemoved:
             // Milky has no friend increase/decrease event.
             return []
 
-        case let .requestReceived(request):
+        case .requestReceived(let request):
             return [encodeRequest(request, time: time)]
 
-        case let .poke(poke):
+        case .poke(let poke):
             if poke.scene == .group {
                 return [
-                    envelope(time: time, type: "group_nudge", data: [
-                        "group_id": MilkyEntityEncoder.uin(poke.peerID),
-                        "sender_id": MilkyEntityEncoder.uin(poke.senderID),
-                        "receiver_id": MilkyEntityEncoder.uin(poke.targetID),
-                        "display_action": .string("nudged"),
-                        "display_suffix": .string(""),
-                        "display_action_img_url": .string(""),
-                    ]),
+                    envelope(
+                        time: time, type: "group_nudge",
+                        data: [
+                            "group_id": MilkyEntityEncoder.uin(poke.peerID),
+                            "sender_id": MilkyEntityEncoder.uin(poke.senderID),
+                            "receiver_id": MilkyEntityEncoder.uin(poke.targetID),
+                            "display_action": .string("nudged"),
+                            "display_suffix": .string(""),
+                            "display_action_img_url": .string(""),
+                        ])
                 ]
             }
             return [
-                envelope(time: time, type: "friend_nudge", data: [
-                    "user_id": MilkyEntityEncoder.uin(poke.peerID),
-                    "is_self_send": .bool(poke.senderID == selfID),
-                    "is_self_receive": .bool(poke.targetID == selfID),
-                    "display_action": .string("nudged"),
-                    "display_suffix": .string(""),
-                    "display_action_img_url": .string(""),
-                ]),
+                envelope(
+                    time: time, type: "friend_nudge",
+                    data: [
+                        "user_id": MilkyEntityEncoder.uin(poke.peerID),
+                        "is_self_send": .bool(poke.senderID == selfID),
+                        "is_self_receive": .bool(poke.targetID == selfID),
+                        "display_action": .string("nudged"),
+                        "display_suffix": .string(""),
+                        "display_action_img_url": .string(""),
+                    ])
             ]
 
-        case let .messageReaction(reaction):
+        case .messageReaction(let reaction):
             // Group-only in Milky.
             guard reaction.scene == .group,
-                  let message = try? await entityEncoder.store.message(id: reaction.messageID)
+                let message = try? await entityEncoder.store.message(id: reaction.messageID)
             else { return [] }
             return [
-                envelope(time: time, type: "group_message_reaction", data: [
-                    "group_id": MilkyEntityEncoder.uin(reaction.peerID),
-                    "user_id": MilkyEntityEncoder.uin(reaction.userID),
-                    "message_seq": .number(Double(message.seq)),
-                    "face_id": .string(reaction.reaction),
-                    "reaction_type": "face",
-                    "is_add": .bool(reaction.added),
-                ]),
+                envelope(
+                    time: time, type: "group_message_reaction",
+                    data: [
+                        "group_id": MilkyEntityEncoder.uin(reaction.peerID),
+                        "user_id": MilkyEntityEncoder.uin(reaction.userID),
+                        "message_seq": .number(Double(message.seq)),
+                        "face_id": .string(reaction.reaction),
+                        "reaction_type": "face",
+                        "is_add": .bool(reaction.added),
+                    ])
             ]
 
-        case let .groupFileUploaded(upload):
+        case .groupFileUploaded(let upload):
             return [
-                envelope(time: time, type: "group_file_upload", data: [
-                    "group_id": MilkyEntityEncoder.uin(upload.groupID),
-                    "user_id": MilkyEntityEncoder.uin(upload.userID),
-                    "file_id": .string(upload.asset.id),
-                    "file_name": .string(upload.asset.name),
-                    "file_size": .number(Double(upload.asset.byteCount)),
-                ]),
+                envelope(
+                    time: time, type: "group_file_upload",
+                    data: [
+                        "group_id": MilkyEntityEncoder.uin(upload.groupID),
+                        "user_id": MilkyEntityEncoder.uin(upload.userID),
+                        "file_id": .string(upload.asset.id),
+                        "file_name": .string(upload.asset.name),
+                        "file_size": .number(Double(upload.asset.byteCount)),
+                    ])
             ]
 
         case .connected:
@@ -176,9 +194,11 @@ struct MilkyEventEncoder: Sendable {
 
         case .disconnected:
             return [
-                envelope(time: time, type: "bot_offline", data: [
-                    "reason": .string("Connection closed"),
-                ]),
+                envelope(
+                    time: time, type: "bot_offline",
+                    data: [
+                        "reason": .string("Connection closed")
+                    ])
             ]
         }
     }
@@ -186,33 +206,39 @@ struct MilkyEventEncoder: Sendable {
     private func encodeRequest(_ request: PendingRequest, time: Int64) -> JSONValue {
         switch request.kind {
         case .friend:
-            return envelope(time: time, type: "friend_request", data: [
-                "initiator_id": MilkyEntityEncoder.uin(request.requesterID),
-                // The flag doubles as Milky's string UID, which is what
-                // accept/reject take.
-                "initiator_uid": .string(request.flag),
-                "comment": .string(request.comment),
-                "via": .string("matcha"),
-            ])
+            return envelope(
+                time: time, type: "friend_request",
+                data: [
+                    "initiator_id": MilkyEntityEncoder.uin(request.requesterID),
+                    // The flag doubles as Milky's string UID, which is what
+                    // accept/reject take.
+                    "initiator_uid": .string(request.flag),
+                    "comment": .string(request.comment),
+                    "via": .string("matcha"),
+                ])
 
         case .groupJoin:
-            return envelope(time: time, type: "group_join_request", data: [
-                "group_id": MilkyEntityEncoder.uin(request.groupID ?? "0"),
-                "notification_seq": .number(Double(Self.notificationSeq(for: request))),
-                "is_filtered": false,
-                "initiator_id": MilkyEntityEncoder.uin(request.requesterID),
-                "comment": .string(request.comment),
-            ])
+            return envelope(
+                time: time, type: "group_join_request",
+                data: [
+                    "group_id": MilkyEntityEncoder.uin(request.groupID ?? "0"),
+                    "notification_seq": .number(Double(Self.notificationSeq(for: request))),
+                    "is_filtered": false,
+                    "initiator_id": MilkyEntityEncoder.uin(request.requesterID),
+                    "comment": .string(request.comment),
+                ])
 
         case .groupInvite:
             // Milky distinguishes "invite me into a group" (`group_invitation`) from
             // "someone was invited and needs approval" (`group_invited_join_request`).
             // A request addressed to the bot itself is the former.
-            return envelope(time: time, type: "group_invitation", data: [
-                "group_id": MilkyEntityEncoder.uin(request.groupID ?? "0"),
-                "invitation_seq": .number(Double(Self.notificationSeq(for: request))),
-                "initiator_id": MilkyEntityEncoder.uin(request.requesterID),
-            ])
+            return envelope(
+                time: time, type: "group_invitation",
+                data: [
+                    "group_id": MilkyEntityEncoder.uin(request.groupID ?? "0"),
+                    "invitation_seq": .number(Double(Self.notificationSeq(for: request))),
+                    "initiator_id": MilkyEntityEncoder.uin(request.requesterID),
+                ])
         }
     }
 

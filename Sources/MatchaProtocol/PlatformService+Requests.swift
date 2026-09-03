@@ -6,10 +6,12 @@ import MatchaCore
 /// A request is raised here, delivered to the framework as an event, and later
 /// resolved when the framework calls the matching action. The `flag` is the token
 /// that ties those two moments together.
-public extension PlatformService {
+extension PlatformService {
     /// Someone asks to add a persona as a friend.
     @discardableResult
-    func requestFriend(requesterID: String, targetID: String, comment: String = "") async throws -> PendingRequest {
+    public func requestFriend(requesterID: String, targetID: String, comment: String = "") async throws
+        -> PendingRequest
+    {
         guard try await store.user(id: requesterID) != nil else {
             throw PlatformError.userNotFound(requesterID)
         }
@@ -33,7 +35,7 @@ public extension PlatformService {
 
     /// Someone asks to join a group.
     @discardableResult
-    func requestJoinGroup(
+    public func requestJoinGroup(
         groupID: String,
         requesterID: String,
         targetBotID: String,
@@ -60,7 +62,7 @@ public extension PlatformService {
 
     /// Someone invites a bot into a group.
     @discardableResult
-    func inviteToGroup(
+    public func inviteToGroup(
         groupID: String,
         inviterID: String,
         inviteeID: String,
@@ -85,7 +87,7 @@ public extension PlatformService {
     ///
     /// Accepting has side effects — a friendship is recorded or a member joins — and
     /// those produce their own events, exactly as a real platform would.
-    func resolveRequest(
+    public func resolveRequest(
         flag: String,
         approve: Bool,
         reason: String = "",
@@ -144,7 +146,7 @@ public extension PlatformService {
     }
 
     /// Removes a friendship in both directions and announces it.
-    func removeFriend(userID: String, friendID: String) async throws {
+    public func removeFriend(userID: String, friendID: String) async throws {
         guard try await store.friendship(userID: userID, friendID: friendID) != nil else {
             throw PlatformError.notPermitted("The users are not friends")
         }
@@ -154,7 +156,7 @@ public extension PlatformService {
 
     /// Records a friendship directly, skipping the request round-trip. Used when the
     /// operator wires up personas in the UI.
-    func addFriendship(userID: String, friendID: String, remark: String = "") async throws {
+    public func addFriendship(userID: String, friendID: String, remark: String = "") async throws {
         guard try await store.user(id: userID) != nil else {
             throw PlatformError.userNotFound(userID)
         }
@@ -168,7 +170,7 @@ public extension PlatformService {
     }
 
     /// Announces a file upload into a group.
-    func uploadGroupFile(groupID: String, userID: String, asset: Asset) async throws {
+    public func uploadGroupFile(groupID: String, userID: String, asset: Asset) async throws {
         guard try await store.member(groupID: groupID, userID: userID) != nil else {
             throw PlatformError.notAMember(groupID: groupID, userID: userID)
         }

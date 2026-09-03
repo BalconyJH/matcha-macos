@@ -38,16 +38,16 @@ public struct SettingsView: View {
                     portText: $draft.portText,
                     protocolChoice: $draft.protocolChoice
                 )
-                    .tabItem { Label("Connection", systemImage: "network") }
-                    .tag(MatchaSettingsTab.connection)
+                .tabItem { Label("Connection", systemImage: "network") }
+                .tag(MatchaSettingsTab.connection)
 
                 RoleSettingsTab(
                     environment: environment,
                     activeUserID: $draft.activeUserID,
                     botUserID: $draft.botUserID
                 )
-                    .tabItem { Label("Personas", systemImage: "person.2") }
-                    .tag(MatchaSettingsTab.roles)
+                .tabItem { Label("Personas", systemImage: "person.2") }
+                .tag(MatchaSettingsTab.roles)
 
                 AboutTab()
                     .tabItem { Label("About", systemImage: "info.circle") }
@@ -62,8 +62,8 @@ public struct SettingsView: View {
                     resetDraft()
                     dismiss()
                 }
-                    .keyboardShortcut(.cancelAction)
-                    .disabled(isSaving)
+                .keyboardShortcut(.cancelAction)
+                .disabled(isSaving)
                 Button("Save", action: save)
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
@@ -96,7 +96,7 @@ public struct SettingsView: View {
         environment.selectedProtocol = draft.protocolChoice
 
         if let activeUserID = draft.activeUserID,
-           activeUserID != environment.activeUserID
+            activeUserID != environment.activeUserID
         {
             environment.setActiveUser(activeUserID)
         }
@@ -153,7 +153,7 @@ private struct PortValidation {
             message = "Enter a port"
             return
         }
-        guard trimmed.utf8.allSatisfy({ (48 ... 57).contains($0) }) else {
+        guard trimmed.utf8.allSatisfy({ (48...57).contains($0) }) else {
             value = nil
             message = "The port can contain decimal digits only"
             return
@@ -195,9 +195,11 @@ private struct ConnectionSettingsTab: View {
                     }
                     .help(connectionModeHelp)
                 } else {
-                    Text("Matcha serves the Milky API and event WebSocket together. WebHooks below are optional additional event destinations.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "Matcha serves the Milky API and event WebSocket together. WebHooks below are optional additional event destinations."
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 }
             }
 
@@ -312,9 +314,11 @@ private struct ConnectionSettingsTab: View {
                 } header: {
                     Text("Event WebHooks")
                 } footer: {
-                    Text("Optional. Every event is still available from /event and is also POSTed to each destination. nonebot-adapter-milky receives WebHook events at /milky/.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "Optional. Every event is still available from /event and is also POSTed to each destination. nonebot-adapter-milky receives WebHook events at /milky/."
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 }
             }
 
@@ -335,7 +339,7 @@ private struct ConnectionSettingsTab: View {
                     Toggle("Reconnect Automatically", isOn: binding(\.autoReconnect))
 
                     if settings.autoReconnect {
-                        Stepper(value: reconnectSecondsBinding, in: 1 ... 60) {
+                        Stepper(value: reconnectSecondsBinding, in: 1...60) {
                             LabeledContent("Reconnect Delay", value: "\(reconnectSecondsBinding.wrappedValue) seconds")
                         }
                     }
@@ -344,9 +348,11 @@ private struct ConnectionSettingsTab: View {
                 Toggle("Echo Bot-Generated Events", isOn: binding(\.postSelfEvents))
                     .help("When disabled, the bot’s own messages are not sent back to it as events")
 
-                Text("When disabled, actions performed by the bot are not sent back to it as incoming events. This prevents loops caused by the framework receiving its own messages. Enable this when debugging the framework’s sending logic.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "When disabled, actions performed by the bot are not sent back to it as incoming events. This prevents loops caused by the framework receiving its own messages. Enable this when debugging the framework’s sending logic."
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -453,17 +459,21 @@ private struct ConnectionSettingsTab: View {
     }
 
     private var authenticationHelp: String {
-        let base = "Leave this blank to disable authentication. Any program that can reach the port will be able to send and receive messages as any persona. This is why the default host is the local loopback address, 127.0.0.1. Set a token if you use a LAN address."
+        let base =
+            "Leave this blank to disable authentication. Any program that can reach the port will be able to send and receive messages as any persona. This is why the default host is the local loopback address, 127.0.0.1. Set a token if you use a LAN address."
         guard settings.transport == .milkyService else { return base }
-        return base + " Milky uses the same token for API calls, /event WebSocket connections, and outgoing WebHook deliveries."
+        return base
+            + " Milky uses the same token for API calls, /event WebSocket connections, and outgoing WebHook deliveries."
     }
 
     private var reverseConnectionHelp: String {
         switch protocolChoice {
         case .oneBotV11:
-            return "For a reverse connection, Matcha connects to this address. NoneBot V11 must use ReverseDriver and listen on the same host, port, and path."
+            return
+                "For a reverse connection, Matcha connects to this address. NoneBot V11 must use ReverseDriver and listen on the same host, port, and path."
         case .oneBotV12:
-            return "For a reverse connection, Matcha connects to this address. NoneBot V12 must use an ASGI driver, such as ~fastapi, and listen on the same host, port, and path."
+            return
+                "For a reverse connection, Matcha connects to this address. NoneBot V12 must use an ASGI driver, such as ~fastapi, and listen on the same host, port, and path."
         case .milky:
             return ""
         }
@@ -497,7 +507,7 @@ private struct ConnectionSettingsTab: View {
     /// Milky shares one listener and port, but the event endpoint has its own URL.
     private var eventStreamText: String? {
         guard let settings = previewSettings,
-              settings.transport == .milkyService
+            settings.transport == .milkyService
         else { return nil }
         return settings.eventStreamURL?.absoluteString
     }
@@ -587,7 +597,8 @@ private struct RoleSettingsTab: View {
 
     private var assignmentHint: String {
         if botUserID == nil {
-            return "Select a bot account before connecting the framework. The two identities should usually use different personas."
+            return
+                "Select a bot account before connecting the framework. The two identities should usually use different personas."
         }
         return "The sending identity represents your actions; the bot account is the protocol self ID."
     }
@@ -639,9 +650,11 @@ private struct AboutTab: View {
                 LabeledContent("Matcha for macOS", value: "QQ platform simulator and bot framework debugger")
                 LabeledContent("Supported Protocols", value: "OneBot V11 / V12, Milky 1.3")
             } footer: {
-                Text("Matcha acts as the chat platform, allowing a bot framework to connect and drive complete conversation flows. All personas and messages are generated locally.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "Matcha acts as the chat platform, allowing a bot framework to connect and drive complete conversation flows. All personas and messages are generated locally."
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

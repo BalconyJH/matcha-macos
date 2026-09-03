@@ -1,11 +1,11 @@
 import Foundation
-import Testing
-
 import MatchaCore
-@testable import MatchaLogging
 import MatchaMilky
 import MatchaOneBot
 import MatchaProtocol
+import Testing
+
+@testable import MatchaLogging
 @testable import MatchaTransport
 @testable import MatchaUI
 
@@ -37,9 +37,9 @@ struct WebSocketTransportTests {
             try await withTimeout(waitingFor: "the client to reach ready") {
                 for await update in client.updates {
                     switch update {
-                    case let .connected(connection):
+                    case .connected(let connection):
                         return connection
-                    case let .failed(error):
+                    case .failed(let error):
                         throw error
                     case .reconnecting:
                         continue
@@ -81,7 +81,7 @@ struct WebSocketTransportTests {
         let measurement = Task {
             try await withTimeout(waitingFor: "the protocol session to publish RTT") {
                 for await update in updates {
-                    if case let .measured(duration) = update {
+                    if case .measured(let duration) = update {
                         return duration
                     }
                 }
@@ -164,7 +164,7 @@ struct WebSocketTransportTests {
         }
 
         do {
-            for _ in 0 ..< 300 where environment.users.count < 3 {
+            for _ in 0..<300 where environment.users.count < 3 {
                 try await Task.sleep(for: .milliseconds(10))
             }
             #expect(environment.users.count == 3)
@@ -180,7 +180,7 @@ struct WebSocketTransportTests {
             )
             await environment.connect()
 
-            for _ in 0 ..< 300 where !environment.sessionState.isConnected {
+            for _ in 0..<300 where !environment.sessionState.isConnected {
                 try await Task.sleep(for: .milliseconds(10))
             }
             #expect(environment.sessionState.isConnected)
@@ -188,7 +188,7 @@ struct WebSocketTransportTests {
             await environment.setBotUser(newBot.id)
             let connections = try await acceptedConnections.value
             #expect(connections[0].id != connections[1].id)
-            for _ in 0 ..< 300 where handshakes.snapshot().count < 2 {
+            for _ in 0..<300 where handshakes.snapshot().count < 2 {
                 try await Task.sleep(for: .milliseconds(10))
             }
             let capturedHeaders = handshakes.snapshot()
@@ -229,8 +229,8 @@ struct WebSocketTransportTests {
                 try await withTimeout(waitingFor: "a message from the new bot session") {
                     for await frame in connections[1].frames {
                         guard let text = frame.textValue,
-                              let payload = try? JSONValue.decode(from: Data(text.utf8)),
-                              payload["post_type"]?.stringValue == "message"
+                            let payload = try? JSONValue.decode(from: Data(text.utf8)),
+                            payload["post_type"]?.stringValue == "message"
                                 || payload["type"]?.stringValue == "message"
                         else {
                             continue
@@ -241,7 +241,7 @@ struct WebSocketTransportTests {
                 }
             }
 
-            for _ in 0 ..< 300 where !environment.sessionState.isConnected {
+            for _ in 0..<300 where !environment.sessionState.isConnected {
                 try await Task.sleep(for: .milliseconds(10))
             }
             #expect(environment.sessionState.isConnected)
@@ -300,7 +300,7 @@ struct WebSocketTransportTests {
         let measurement = Task {
             try await withTimeout(waitingFor: "the forward-connection protocol session to publish RTT") {
                 for await update in updates {
-                    if case let .measured(duration) = update {
+                    if case .measured(let duration) = update {
                         return duration
                     }
                 }
@@ -342,7 +342,7 @@ struct WebSocketTransportTests {
             try await second.start()
             Issue.record("The second listener must not become ready on the same port")
         } catch let error as TransportError {
-            guard case let .listenFailed(reportedPort, _) = error else {
+            guard case .listenFailed(let reportedPort, _) = error else {
                 Issue.record("Expected listenFailed, got \(error)")
                 return
             }
@@ -382,7 +382,7 @@ struct WebSocketTransportTests {
         )
 
         do {
-            for _ in 0 ..< 300 where environment.users.count < 2 {
+            for _ in 0..<300 where environment.users.count < 2 {
                 try await Task.sleep(for: .milliseconds(10))
             }
             environment.setActiveUser(user.id)
@@ -458,9 +458,9 @@ struct WebSocketTransportTests {
             try await withTimeout(waitingFor: "the handshake-ordering test to connect") {
                 for await update in client.updates {
                     switch update {
-                    case let .connected(connection):
+                    case .connected(let connection):
                         return connection
-                    case let .failed(error):
+                    case .failed(let error):
                         throw error
                     case .reconnecting:
                         continue
@@ -532,9 +532,9 @@ struct WebSocketTransportTests {
             try await withTimeout(waitingFor: "the pending-handshake connection to establish during stop") {
                 for await update in client.updates {
                     switch update {
-                    case let .connected(connection):
+                    case .connected(let connection):
                         return connection
-                    case let .failed(error):
+                    case .failed(let error):
                         throw error
                     case .reconnecting:
                         continue
@@ -617,9 +617,9 @@ struct WebSocketTransportTests {
             try await withTimeout(waitingFor: "the Milky /event WebSocket to connect") {
                 for await update in eventClient.updates {
                     switch update {
-                    case let .connected(connection):
+                    case .connected(let connection):
                         return connection
-                    case let .failed(error):
+                    case .failed(let error):
                         throw error
                     case .reconnecting:
                         continue
@@ -821,8 +821,8 @@ struct WebSocketTransportTests {
         authenticator: @escaping WebSocketServer.Authenticator = { _, _ in .accept }
     ) async throws -> (WebSocketServer, UInt16) {
         var lastError: (any Error)?
-        for _ in 0 ..< 20 {
-            let port = UInt16.random(in: 30_000 ... 60_000)
+        for _ in 0..<20 {
+            let port = UInt16.random(in: 30_000...60_000)
             let server = WebSocketServer(port: port, authenticator: authenticator)
             do {
                 try await server.start()
@@ -839,8 +839,8 @@ struct WebSocketTransportTests {
         implementation: any ProtocolImplementation = ProbeAdapter()
     ) async throws -> (ProtocolSession, UInt16) {
         var lastError: (any Error)?
-        for _ in 0 ..< 20 {
-            let port = UInt16.random(in: 30_000 ... 60_000)
+        for _ in 0..<20 {
+            let port = UInt16.random(in: 30_000...60_000)
             let session = ProtocolSession(
                 implementation: implementation,
                 platform: platform,
@@ -868,8 +868,8 @@ struct WebSocketTransportTests {
         token: String
     ) async throws -> (ProtocolSession, UInt16) {
         var lastError: (any Error)?
-        for _ in 0 ..< 20 {
-            let port = UInt16.random(in: 30_000 ... 60_000)
+        for _ in 0..<20 {
+            let port = UInt16.random(in: 30_000...60_000)
             let session = ProtocolSession(
                 implementation: implementation,
                 platform: platform,
@@ -1057,8 +1057,8 @@ private final class HandshakeHistory: @unchecked Sendable {
     }
 }
 
-private extension SessionState {
-    var isConnected: Bool {
+extension SessionState {
+    fileprivate var isConnected: Bool {
         if case .connected = self { return true }
         return false
     }

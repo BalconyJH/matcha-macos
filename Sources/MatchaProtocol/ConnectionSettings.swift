@@ -90,7 +90,8 @@ public struct ConnectionSettings: Codable, Sendable, Hashable {
         let configuredPath = path.trimmingCharacters(in: .whitespaces)
         let fallbackPath = defaultPath.trimmingCharacters(in: .whitespaces)
         let resolvedPath = configuredPath.isEmpty ? fallbackPath : configuredPath
-        components.path = resolvedPath.isEmpty || resolvedPath == "/"
+        components.path =
+            resolvedPath.isEmpty || resolvedPath == "/"
             ? ""
             : (resolvedPath.hasPrefix("/") ? resolvedPath : "/" + resolvedPath)
         return components.url
@@ -118,10 +119,10 @@ public struct ConnectionSettings: Codable, Sendable, Hashable {
     public static func milkyWebhookEndpoint(for rawValue: String) -> URL? {
         let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let components = URLComponents(string: value),
-              let scheme = components.scheme?.lowercased(),
-              scheme == "http" || scheme == "https",
-              components.host?.isEmpty == false,
-              components.port.map({ (1 ... Int(UInt16.max)).contains($0) }) ?? true
+            let scheme = components.scheme?.lowercased(),
+            scheme == "http" || scheme == "https",
+            components.host?.isEmpty == false,
+            components.port.map({ (1...Int(UInt16.max)).contains($0) }) ?? true
         else { return nil }
         return components.url
     }
@@ -153,7 +154,8 @@ public struct ConnectionSettings: Codable, Sendable, Hashable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let persistedTransport = try container.decodeIfPresent(String.self, forKey: .transport)
+        let persistedTransport =
+            try container.decodeIfPresent(String.self, forKey: .transport)
             ?? TransportMode.webSocketServer.rawValue
         if ["httpServer", "milkyWebSocket", "milkyWebhook"].contains(persistedTransport) {
             transport = .milkyService
@@ -176,17 +178,19 @@ public struct ConnectionSettings: Codable, Sendable, Hashable {
         ) {
             milkyWebhookURLs = destinations
         } else if persistedTransport == "milkyWebhook" {
-            let destination = try container.decodeIfPresent(String.self, forKey: .milkyWebhookURL)
+            let destination =
+                try container.decodeIfPresent(String.self, forKey: .milkyWebhookURL)
                 ?? Self.defaultMilkyWebhookURL
             milkyWebhookURLs = destination.isEmpty ? [] : [destination]
         } else {
             milkyWebhookURLs = []
         }
         autoReconnect = try container.decodeIfPresent(Bool.self, forKey: .autoReconnect) ?? true
-        reconnectInterval = try container.decodeIfPresent(
-            TimeInterval.self,
-            forKey: .reconnectInterval
-        ) ?? 3
+        reconnectInterval =
+            try container.decodeIfPresent(
+                TimeInterval.self,
+                forKey: .reconnectInterval
+            ) ?? 3
         postSelfEvents = try container.decodeIfPresent(Bool.self, forKey: .postSelfEvents) ?? false
     }
 

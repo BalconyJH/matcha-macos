@@ -9,8 +9,8 @@ public enum WebSocketFrame: Sendable, Hashable {
     /// The bytes to send.
     public var data: Data {
         switch self {
-        case let .text(t): return Data(t.utf8)
-        case let .binary(d): return d
+        case .text(let t): return Data(t.utf8)
+        case .binary(let d): return d
         }
     }
 
@@ -24,8 +24,8 @@ public enum WebSocketFrame: Sendable, Hashable {
     /// UTF-8 text if this frame carries any.
     public var textValue: String? {
         switch self {
-        case let .text(t): return t
-        case let .binary(d): return String(data: d, encoding: .utf8)
+        case .text(let t): return t
+        case .binary(let d): return String(data: d, encoding: .utf8)
         }
     }
 }
@@ -42,17 +42,17 @@ public enum TransportError: Error, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case let .listenFailed(port, underlying):
+        case .listenFailed(let port, let underlying):
             return "Failed to listen on port \(port): \(underlying)"
-        case let .connectFailed(reason):
+        case .connectFailed(let reason):
             return "Connection failed: \(reason)"
-        case let .handshakeRejected(reason):
+        case .handshakeRejected(let reason):
             return "Handshake rejected: \(reason)"
         case .notConnected:
             return "Not connected"
         case .cancelled:
             return "Connection cancelled"
-        case let .invalidURL(url):
+        case .invalidURL(let url):
             return "Invalid URL: \(url)"
         case .timedOut:
             return "Connection timed out"

@@ -88,7 +88,7 @@ public final class AppEnvironment {
         // once to the version-1 empty sentinel; after this, `/` is always an explicit
         // operator choice and is never rewritten.
         if needsMigration,
-           connectionSettings.path.trimmingCharacters(in: .whitespacesAndNewlines) == "/"
+            connectionSettings.path.trimmingCharacters(in: .whitespacesAndNewlines) == "/"
         {
             connectionSettings.path = ""
         }
@@ -131,28 +131,30 @@ public final class AppEnvironment {
 
     /// Mirrors the store's live queries into observable properties.
     private func startObserving() {
-        observationTasks.append(observe(store.observeUsers()) { [weak self] value in
-            guard let self else { return }
-            users = value
-            // Adopt sensible defaults the first time personas appear, so a new
-            // install is usable without visiting settings.
-            let userIDs = Set(value.map(\.id))
-            if activeUserID.map({ userIDs.contains($0) }) != true {
-                updateActiveUser(value.first?.id, recordSelection: false)
-            }
+        observationTasks.append(
+            observe(store.observeUsers()) { [weak self] value in
+                guard let self else { return }
+                users = value
+                // Adopt sensible defaults the first time personas appear, so a new
+                // install is usable without visiting settings.
+                let userIDs = Set(value.map(\.id))
+                if activeUserID.map({ userIDs.contains($0) }) != true {
+                    updateActiveUser(value.first?.id, recordSelection: false)
+                }
 
-            if botUserID.map({ userIDs.contains($0) }) != true {
-                _ = await transitionBotUser(
-                    to: value.count > 1 ? value.last?.id : nil,
-                    recordSelection: false
-                )
-            } else {
-                await syncBotRegistration()
-            }
-        })
-        observationTasks.append(observe(store.observeGroups()) { [weak self] value in
-            self?.groups = value
-        })
+                if botUserID.map({ userIDs.contains($0) }) != true {
+                    _ = await transitionBotUser(
+                        to: value.count > 1 ? value.last?.id : nil,
+                        recordSelection: false
+                    )
+                } else {
+                    await syncBotRegistration()
+                }
+            })
+        observationTasks.append(
+            observe(store.observeGroups()) { [weak self] value in
+                self?.groups = value
+            })
         refreshConversations()
     }
 
@@ -305,7 +307,7 @@ public final class AppEnvironment {
         guard activeUserID != id else { return }
         activeUserID = id
         if let selectedChat, selectedChat.scene.isPrivate,
-           id.flatMap({ selectedChat.counterpartID(for: $0) }) == nil
+            id.flatMap({ selectedChat.counterpartID(for: $0) }) == nil
         {
             selectChat(nil)
         }
@@ -476,7 +478,7 @@ public final class AppEnvironment {
                     )
                 }
                 if let activeBotUserID = self.activeBotUserID,
-                   activeBotUserID != chat.selfID
+                    activeBotUserID != chat.selfID
                 {
                     throw PlatformError.notPermitted(
                         "The live connection belongs to a different bot account; reconnect first"
@@ -529,10 +531,10 @@ public final class AppEnvironment {
     /// not representable by the protocol session and are deliberately rejected.
     func privateChat(with targetID: User.ID) -> Chat? {
         guard friendshipsAreLoaded,
-              let activeUserID, let botUserID,
-              targetID != activeUserID,
-              users.contains(where: { $0.id == activeUserID }),
-              users.contains(where: { $0.id == targetID })
+            let activeUserID, let botUserID,
+            targetID != activeUserID,
+            users.contains(where: { $0.id == activeUserID }),
+            users.contains(where: { $0.id == targetID })
         else {
             return nil
         }
@@ -582,7 +584,7 @@ public final class AppEnvironment {
         guard !summary.lastMessage.isRecalled else { return "[Recalled]" }
         return summary.lastMessage.content
             .map { segment -> String in
-                if case let .mention(userID) = segment {
+                if case .mention(let userID) = segment {
                     guard let userID else { return "@everyone" }
                     return "@\(displayName(for: userID, in: summary.chat))"
                 }
@@ -600,7 +602,8 @@ public final class AppEnvironment {
                 .filter { $0.groupID == chat.peerID }
                 .map(\.userID)
         )
-        return users
+        return
+            users
             .filter { memberIDs.contains($0.id) && $0.id != activeUserID }
             .sorted {
                 let lhs = displayName(for: $0.id, in: chat)
@@ -632,8 +635,8 @@ public final class AppEnvironment {
         }
         await syncBotRegistration()
         guard generation == connectionGeneration,
-              connectionRequested,
-              self.botUserID == botUserID
+            connectionRequested,
+            self.botUserID == botUserID
         else {
             return false
         }
@@ -682,7 +685,7 @@ public final class AppEnvironment {
             Task { [weak self] in
                 for await state in await session.stateUpdates() {
                     guard let self,
-                          isCurrent(session, generation: generation)
+                        isCurrent(session, generation: generation)
                     else { return }
                     sessionState = state
                     recordSessionState(state)
@@ -691,7 +694,7 @@ public final class AppEnvironment {
             Task { [weak self] in
                 for await value in await session.roundTripTimeUpdates() {
                     guard let self,
-                          isCurrent(session, generation: generation)
+                        isCurrent(session, generation: generation)
                     else { return }
                     roundTripTimeState = value
                 }
@@ -699,7 +702,7 @@ public final class AppEnvironment {
             Task { [weak self] in
                 for await entry in await session.trafficLog() {
                     guard let self,
-                          isCurrent(session, generation: generation)
+                        isCurrent(session, generation: generation)
                     else { return }
                     traffic.insert(entry, at: 0)
                     // The inspector is a debugging aid, not an archive.
@@ -709,7 +712,7 @@ public final class AppEnvironment {
             Task { [weak self] in
                 for await diagnostic in await session.diagnostics() {
                     guard let self,
-                          isCurrent(session, generation: generation)
+                        isCurrent(session, generation: generation)
                     else { return }
                     switch diagnostic {
                     case .outboundEventDeliveryFailed:
@@ -850,8 +853,9 @@ public final class AppEnvironment {
 
     func reportAttachmentSelectionFailure(_ error: any Error) {
         let nsError = error as NSError
-        guard !(nsError.domain == NSCocoaErrorDomain
-            && nsError.code == CocoaError.Code.userCancelled.rawValue)
+        guard
+            !(nsError.domain == NSCocoaErrorDomain
+                && nsError.code == CocoaError.Code.userCancelled.rawValue)
         else { return }
         recordOperationFailure(.chooseAttachments, error)
         lastError = error.localizedDescription
@@ -880,9 +884,9 @@ public final class AppEnvironment {
         switch state {
         case .idle:
             break
-        case let .listening(port):
+        case .listening(let port):
             appLog.record(.sessionListening(port: port))
-        case let .ready(port):
+        case .ready(let port):
             appLog.record(.sessionReady(port: port))
         case .connecting:
             appLog.record(.sessionConnecting)
@@ -913,7 +917,7 @@ public final class AppEnvironment {
     /// permission boundary when the operation runs.
     public func canRemoveGroupMember(_ member: GroupMember, from groupID: Group.ID) -> Bool {
         guard let activeUserID, activeUserID != member.userID,
-              let actor = members[MemberKey(groupID: groupID, userID: activeUserID)]
+            let actor = members[MemberKey(groupID: groupID, userID: activeUserID)]
         else { return false }
         return actor.role > .member && actor.role > member.role
     }
@@ -937,10 +941,12 @@ public final class AppEnvironment {
     /// file attached twice is stored once.
     public func ingestAttachment(at url: URL) async -> Asset? {
         do {
-            guard let asset = try await mediaService.ingest(
-                reference: url.path,
-                suggestedName: url.lastPathComponent
-            ) else {
+            guard
+                let asset = try await mediaService.ingest(
+                    reference: url.path,
+                    suggestedName: url.lastPathComponent
+                )
+            else {
                 appLog.record(.attachmentImportUnavailable)
                 return nil
             }
@@ -994,8 +1000,8 @@ public final class AppEnvironment {
     }
 }
 
-private extension ProtocolChoice {
-    var appLogProtocol: AppLogProtocol {
+extension ProtocolChoice {
+    fileprivate var appLogProtocol: AppLogProtocol {
         switch self {
         case .oneBotV11:
             .oneBotV11
@@ -1007,8 +1013,8 @@ private extension ProtocolChoice {
     }
 }
 
-private extension TransportMode {
-    var appLogTransport: AppLogTransport {
+extension TransportMode {
+    fileprivate var appLogTransport: AppLogTransport {
         switch self {
         case .webSocketServer:
             .webSocketServer
@@ -1089,10 +1095,10 @@ public enum ProtocolChoice: String, Codable, Sendable, CaseIterable, Identifiabl
     ]
 }
 
-private extension SessionState {
+extension SessionState {
     /// An operator event can be accepted once a connectionless protocol service is
     /// serving or a bidirectional framework socket is connected.
-    var acceptsOperatorEvents: Bool {
+    fileprivate var acceptsOperatorEvents: Bool {
         switch self {
         case .ready, .connected:
             true
@@ -1122,7 +1128,7 @@ enum SettingsStorage {
 
     static func load(defaults: UserDefaults = .standard) -> ConnectionSettings {
         guard let data = defaults.data(forKey: settingsKey),
-              let decoded = try? JSONDecoder().decode(ConnectionSettings.self, from: data)
+            let decoded = try? JSONDecoder().decode(ConnectionSettings.self, from: data)
         else { return ConnectionSettings() }
         return decoded
     }
@@ -1138,7 +1144,7 @@ enum SettingsStorage {
 
     static func loadProtocol(defaults: UserDefaults = .standard) -> ProtocolChoice {
         guard let raw = defaults.string(forKey: protocolKey),
-              let choice = ProtocolChoice(rawValue: raw)
+            let choice = ProtocolChoice(rawValue: raw)
         else { return .oneBotV11 }
         return choice
     }

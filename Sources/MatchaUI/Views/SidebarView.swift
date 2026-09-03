@@ -195,7 +195,7 @@ struct SidebarView: View {
         )
         let available = environment.users.compactMap { user -> SidebarPrivateChatCandidate? in
             guard let chat = environment.privateChat(with: user.id),
-                  !activePeerIDs.contains(chat.peerID)
+                !activePeerIDs.contains(chat.peerID)
             else {
                 return nil
             }
@@ -265,11 +265,11 @@ struct SidebarView: View {
     private func perform(_ action: SidebarDestructiveAction) async {
         do {
             switch action {
-            case let .clearMessageHistory(chat, _):
+            case .clearMessageHistory(let chat, _):
                 try await environment.clearMessageHistory(in: chat)
-            case let .deleteGroup(id, _):
+            case .deleteGroup(let id, _):
                 try await environment.deleteGroup(id)
-            case let .removeFriend(id, _):
+            case .removeFriend(let id, _):
                 try await environment.removeFriend(id)
             }
             deletionError = nil
@@ -291,28 +291,31 @@ private enum SidebarDestructiveAction: Identifiable {
 
     var id: String {
         switch self {
-        case let .clearMessageHistory(chat, _): return "history:\(chat.id)"
-        case let .deleteGroup(id, _): return "group:\(id)"
-        case let .removeFriend(id, _): return "friend:\(id)"
+        case .clearMessageHistory(let chat, _): return "history:\(chat.id)"
+        case .deleteGroup(let id, _): return "group:\(id)"
+        case .removeFriend(let id, _): return "friend:\(id)"
         }
     }
 
     var title: String {
         switch self {
-        case let .clearMessageHistory(_, title): return "Clear chat history with “\(title)”?"
-        case let .deleteGroup(_, name): return "Permanently delete group chat “\(name)”?"
-        case let .removeFriend(_, name): return "Remove “\(name)” as a friend?"
+        case .clearMessageHistory(_, let title): return "Clear chat history with “\(title)”?"
+        case .deleteGroup(_, let name): return "Permanently delete group chat “\(name)”?"
+        case .removeFriend(_, let name): return "Remove “\(name)” as a friend?"
         }
     }
 
     var message: String {
         switch self {
         case .clearMessageHistory:
-            return "This permanently deletes the conversation history saved for the current bot account. The friend or group chat will not be deleted."
+            return
+                "This permanently deletes the conversation history saved for the current bot account. The friend or group chat will not be deleted."
         case .deleteGroup:
-            return "The group, its members, related requests, and all chat history will be permanently deleted. This cannot be undone."
+            return
+                "The group, its members, related requests, and all chat history will be permanently deleted. This cannot be undone."
         case .removeFriend:
-            return "The accounts will no longer be friends. Chat history will be kept, and the friend can be added again later."
+            return
+                "The accounts will no longer be friends. Chat history will be kept, and the friend can be added again later."
         }
     }
 

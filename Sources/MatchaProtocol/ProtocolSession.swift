@@ -22,15 +22,15 @@ public enum SessionState: Sendable, Equatable {
         switch self {
         case .idle:
             return "Disconnected"
-        case let .listening(port):
+        case .listening(let port):
             return "Listening on port \(port)"
-        case let .ready(port):
+        case .ready(let port):
             return "Serving on port \(port)"
         case .connecting:
             return "Connecting"
-        case let .connected(peer):
+        case .connected(let peer):
             return "Connected to \(peer)"
-        case let .failed(reason):
+        case .failed(let reason):
             return "Connection failed: \(reason)"
         }
     }
@@ -81,7 +81,7 @@ public enum ProtocolSessionError: Error, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case let .unsupportedTransport(identifier, transport):
+        case .unsupportedTransport(let identifier, let transport):
             return "Protocol \(identifier) does not support transport \(transport.rawValue)"
         }
     }
@@ -395,15 +395,16 @@ public actor ProtocolSession {
         }
         setState(.listening(port: settings.port))
 
-        acceptTasks.append(Task { [weak self] in
-            for await connection in server.connections {
-                guard !Task.isCancelled, let self else {
-                    connection.close()
-                    return
+        acceptTasks.append(
+            Task { [weak self] in
+                for await connection in server.connections {
+                    guard !Task.isCancelled, let self else {
+                        connection.close()
+                        return
+                    }
+                    await self.adopt(connection, generation: generation)
                 }
-                await self.adopt(connection, generation: generation)
-            }
-        })
+            })
     }
 
     /// The handshake gate for every inbound WebSocket connection.
@@ -419,7 +420,10 @@ public actor ProtocolSession {
     private static func authenticator(token: String) -> WebSocketServer.Authenticator {
         { _, headers in
             guard !token.isEmpty else { return .accept }
-            guard let presented = headers.bearerToken ?? headers["Sec-WebSocket-Protocol"].flatMap(Self.tokenFromSubprotocol) else {
+            guard
+                let presented = headers.bearerToken
+                    ?? headers["Sec-WebSocket-Protocol"].flatMap(Self.tokenFromSubprotocol)
+            else {
                 return .reject(reason: "Missing Access Token")
             }
             guard presented == token else {
@@ -464,23 +468,24 @@ public actor ProtocolSession {
         webSocketClient = client
         setState(.connecting)
 
-        acceptTasks.append(Task { [weak self] in
-            for await update in client.updates {
-                guard !Task.isCancelled, let self else { return }
-                guard await self.transportGeneration == generation else {
-                    if case let .connected(connection) = update { connection.close() }
-                    return
+        acceptTasks.append(
+            Task { [weak self] in
+                for await update in client.updates {
+                    guard !Task.isCancelled, let self else { return }
+                    guard await self.transportGeneration == generation else {
+                        if case .connected(let connection) = update { connection.close() }
+                        return
+                    }
+                    switch update {
+                    case .connected(let connection):
+                        await adopt(connection, generation: generation)
+                    case .failed(let error):
+                        await setState(.failed(error.localizedDescription))
+                    case .reconnecting(let seconds):
+                        await noteReconnect(after: seconds)
+                    }
                 }
-                switch update {
-                case let .connected(connection):
-                    await adopt(connection, generation: generation)
-                case let .failed(error):
-                    await setState(.failed(error.localizedDescription))
-                case let .reconnecting(seconds):
-                    await noteReconnect(after: seconds)
-                }
-            }
-        })
+            })
 
         client.start()
     }
@@ -505,9 +510,10 @@ public actor ProtocolSession {
     private func startMilkyServer(generation: UInt64) async throws {
         let token = settings.accessToken
         guard let webhookEndpoints = settings.milkyWebhookEndpoints else {
-            let invalidValue = settings.milkyWebhookURLs.first {
-                ConnectionSettings.milkyWebhookEndpoint(for: $0) == nil
-            } ?? ""
+            let invalidValue =
+                settings.milkyWebhookURLs.first {
+                    ConnectionSettings.milkyWebhookEndpoint(for: $0) == nil
+                } ?? ""
             throw TransportError.invalidURL(invalidValue)
         }
         let webhooks = webhookEndpoints.map { endpoint in
@@ -548,17 +554,18 @@ public actor ProtocolSession {
         // latency, so the session does not present it as service RTT.
         setRoundTripTime(.unsupported)
 
-        acceptTasks.append(Task { [weak self] in
-            for await connection in api.webSocketConnections {
-                guard !Task.isCancelled, let self else {
-                    connection.close()
-                    return
+        acceptTasks.append(
+            Task { [weak self] in
+                for await connection in api.webSocketConnections {
+                    guard !Task.isCancelled, let self else {
+                        connection.close()
+                        return
+                    }
+                    // Push-only: Milky sends nothing up this socket, so the connection is
+                    // registered for fan-out without a receive loop.
+                    await self.adoptEventStream(connection, generation: generation)
                 }
-                // Push-only: Milky sends nothing up this socket, so the connection is
-                // registered for fan-out without a receive loop.
-                await self.adoptEventStream(connection, generation: generation)
-            }
-        })
+            })
     }
 
     private static func milkyEventUpgrade(
@@ -668,7 +675,7 @@ public actor ProtocolSession {
         }
         for frame in handshakeFrames {
             guard await send(frame, to: connection, generation: generation),
-                  canPromote(connection, generation: generation)
+                canPromote(connection, generation: generation)
             else {
                 abandonPending(connection)
                 return
@@ -716,9 +723,9 @@ public actor ProtocolSession {
         connectionTasks[id]?.cancel()
         connectionTasks[id] = nil
         if generation == transportGeneration,
-           connections.isEmpty,
-           eventConnections.isEmpty,
-           milkyServer != nil
+            connections.isEmpty,
+            eventConnections.isEmpty,
+            milkyServer != nil
         {
             setMilkyIdleState()
         }
@@ -783,11 +790,11 @@ public actor ProtocolSession {
         generation: UInt64
     ) async {
         guard generation == transportGeneration,
-              connections[connection.id] === connection
+            connections[connection.id] === connection
         else { return }
         guard let text = frame.textValue else { return }
         guard let payload = try? JSONValue.decode(from: Data(text.utf8)),
-              let action = payload["action"]?.stringValue
+            let action = payload["action"]?.stringValue
         else {
             log(
                 TrafficEntry(
@@ -807,7 +814,7 @@ public actor ProtocolSession {
             call: ProtocolCall(name: action, parameters: parameters, echo: echo)
         )
         guard generation == transportGeneration,
-              connections[connection.id] === connection
+            connections[connection.id] === connection
         else { return }
         // The transport owns correlation: the implementation never sees `echo`, and the
         // envelope closure splices it back on.
@@ -836,7 +843,7 @@ public actor ProtocolSession {
         generation: UInt64
     ) async {
         guard generation == transportGeneration,
-              let connection = connections[connectionID]
+            let connection = connections[connectionID]
         else { return }
         await send(frame, to: connection, generation: generation)
     }
@@ -1003,8 +1010,8 @@ public actor ProtocolSession {
         logging: Bool = true
     ) async -> Bool {
         guard generation == transportGeneration,
-              (pendingConnections[connection.id] === connection
-                  || connections[connection.id] === connection)
+            pendingConnections[connection.id] === connection
+                || connections[connection.id] === connection
         else { return false }
         guard let text = try? frame.payload.jsonText() else { return false }
         if logging {
@@ -1034,7 +1041,7 @@ public actor ProtocolSession {
         logging: Bool = true
     ) async -> Bool {
         guard generation == transportGeneration,
-              eventConnections[connection.id] === connection
+            eventConnections[connection.id] === connection
         else { return false }
         guard let text = try? frame.payload.jsonText() else { return false }
         if logging {
@@ -1067,9 +1074,9 @@ public actor ProtocolSession {
         logging: Bool = true
     ) async -> Bool {
         guard generation == transportGeneration,
-              settings.transport == .milkyService,
-              !webhookClients.isEmpty,
-              let data = try? frame.payload.encoded()
+            settings.transport == .milkyService,
+            !webhookClients.isEmpty,
+            let data = try? frame.payload.encoded()
         else { return false }
         if logging {
             log(
@@ -1098,7 +1105,8 @@ public actor ProtocolSession {
         let payload = frame.payload
         if let type = payload["event_type"]?.stringValue { return type }
         if let type = payload["post_type"]?.stringValue {
-            let detail = payload["message_type"]?.stringValue
+            let detail =
+                payload["message_type"]?.stringValue
                 ?? payload["notice_type"]?.stringValue
                 ?? payload["meta_event_type"]?.stringValue
                 ?? payload["request_type"]?.stringValue

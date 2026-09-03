@@ -78,11 +78,13 @@ public actor MediaService {
         fallbackURL: String? = nil,
         suggestedName: String? = nil
     ) async throws -> Asset? {
-        guard let asset = try await assetStore.ingest(
-            reference: reference,
-            fallbackURL: fallbackURL,
-            suggestedName: suggestedName
-        ) else { return nil }
+        guard
+            let asset = try await assetStore.ingest(
+                reference: reference,
+                fallbackURL: fallbackURL,
+                suggestedName: suggestedName
+            )
+        else { return nil }
         try await store.save(asset)
         return asset
     }
@@ -147,10 +149,10 @@ public actor MediaService {
 
         let location = await assetStore.location(of: id)
         guard FileManager.default.fileExists(atPath: location.path),
-              let source = CGImageSourceCreateWithURL(location as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-              let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
-              let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue
+            let source = CGImageSourceCreateWithURL(location as CFURL, nil),
+            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+            let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+            let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue
         else { return nil }
 
         return PixelSize(width: width, height: height)

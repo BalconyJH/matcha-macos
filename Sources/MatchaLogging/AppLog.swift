@@ -63,11 +63,13 @@ public final class AppLog: Sendable {
     /// dependency injection from the composition root.
     public static let standard: AppLog = {
         let fileManager = FileManager.default
-        let cachesDirectory = fileManager.urls(
-            for: .cachesDirectory,
-            in: .userDomainMask
-        ).first ?? fileManager.temporaryDirectory
-        let bundleIdentifier = Bundle.main.bundleIdentifier.flatMap { $0.isEmpty ? nil : $0 }
+        let cachesDirectory =
+            fileManager.urls(
+                for: .cachesDirectory,
+                in: .userDomainMask
+            ).first ?? fileManager.temporaryDirectory
+        let bundleIdentifier =
+            Bundle.main.bundleIdentifier.flatMap { $0.isEmpty ? nil : $0 }
             ?? "Matcha"
         return AppLog(
             directory: cachesDirectory.appendingPathComponent(bundleIdentifier, isDirectory: true),
@@ -310,10 +312,12 @@ public final class AppLog: Sendable {
         guard !fileManager.fileExists(atPath: state.activeFileURL.path) else {
             return
         }
-        guard fileManager.createFile(
-            atPath: state.activeFileURL.path,
-            contents: nil
-        ) else {
+        guard
+            fileManager.createFile(
+                atPath: state.activeFileURL.path,
+                contents: nil
+            )
+        else {
             throw CocoaError(.fileWriteUnknown)
         }
     }
@@ -355,10 +359,12 @@ public final class AppLog: Sendable {
             at: state.activeFileURL,
             to: state.rotatedFileURL(index: 1)
         )
-        guard fileManager.createFile(
-            atPath: state.activeFileURL.path,
-            contents: nil
-        ) else {
+        guard
+            fileManager.createFile(
+                atPath: state.activeFileURL.path,
+                contents: nil
+            )
+        else {
             throw CocoaError(.fileWriteUnknown)
         }
     }

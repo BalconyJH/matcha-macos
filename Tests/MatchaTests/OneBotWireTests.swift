@@ -1,9 +1,8 @@
 import Foundation
-import Testing
-
 import MatchaCore
 import MatchaOneBot
 import MatchaProtocol
+import Testing
 
 /// Media never touches the filesystem here: the resolver answers with predictable
 /// identifiers so a segment assertion is about wire shape only.

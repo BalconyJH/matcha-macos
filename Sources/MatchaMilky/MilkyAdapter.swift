@@ -167,7 +167,7 @@ public final class MilkyProtocolImplementation: ProtocolImplementation, @uncheck
         // Everything else is the documented catch-all, whose meaning the protocol
         // side is free to define.
         case .userNotFound, .groupNotFound, .messageNotFound, .requestNotFound,
-             .notAMember, .muted, .wholeGroupMuted, .notPermitted, .alreadyExists:
+            .notAMember, .muted, .wholeGroupMuted, .notPermitted, .alreadyExists:
             retcode = -404
         }
         return ProtocolReply(retcode: retcode, message: error.localizedDescription)

@@ -1,10 +1,10 @@
 import Foundation
+import MatchaProtocol
+import MatchaTransport
 import Testing
 
 @testable import MatchaCore
 @testable import MatchaLogging
-import MatchaProtocol
-import MatchaTransport
 
 @Suite("Application Logging")
 struct LoggingTests {
@@ -53,7 +53,7 @@ struct LoggingTests {
             of: AppLogRecord.self,
             returning: [AppLogRecord].self
         ) { group in
-            for index in 0 ..< writeCount {
+            for index in 0..<writeCount {
                 group.addTask {
                     fixture.log.record(.sessionListening(port: UInt16(index + 1)))
                 }
@@ -67,12 +67,12 @@ struct LoggingTests {
         }
 
         let persistedRecords = try await exportedRecords(from: fixture)
-        let expectedSequences = (1 ... writeCount).map(UInt64.init)
+        let expectedSequences = (1...writeCount).map(UInt64.init)
         #expect(persistedRecords.map(\.sequence) == expectedSequences)
         #expect(Set(returnedRecords.map(\.sequence)).count == writeCount)
         #expect(
             Set(persistedRecords.compactMap(\.fields.port))
-                == Set((1 ... writeCount).map(UInt16.init))
+                == Set((1...writeCount).map(UInt16.init))
         )
     }
 
@@ -98,7 +98,7 @@ struct LoggingTests {
         )
 
         await withTaskGroup(of: Void.self) { group in
-            for port in UInt16(1) ... 100 {
+            for port in UInt16(1)...100 {
                 group.addTask { first.record(.sessionListening(port: port)) }
                 group.addTask { second.record(.sessionListening(port: port + 100)) }
             }
@@ -112,11 +112,11 @@ struct LoggingTests {
         #expect(Set(recordsBySession.keys) == [firstSessionID, secondSessionID])
         #expect(
             recordsBySession[firstSessionID]?.map(\.sequence).sorted()
-                == (1 ... 100).map(UInt64.init)
+                == (1...100).map(UInt64.init)
         )
         #expect(
             recordsBySession[secondSessionID]?.map(\.sequence).sorted()
-                == (1 ... 100).map(UInt64.init)
+                == (1...100).map(UInt64.init)
         )
     }
 
@@ -125,7 +125,7 @@ struct LoggingTests {
         let fixture = try makeFixture(maxFileSize: 260, maxRotatedFiles: 12)
         defer { fixture.remove() }
 
-        for port in UInt16(1) ... 12 {
+        for port in UInt16(1)...12 {
             fixture.log.record(.sessionListening(port: port))
         }
 
@@ -136,7 +136,7 @@ struct LoggingTests {
         #expect(logFiles.count > 1)
 
         let records = try await exportedRecords(from: fixture)
-        #expect(records.map(\.fields.port) == (1 ... 12).map(UInt16.init))
+        #expect(records.map(\.fields.port) == (1...12).map(UInt16.init))
     }
 
     @Test
@@ -144,7 +144,7 @@ struct LoggingTests {
         let fixture = try makeFixture(maxEntries: 5)
         defer { fixture.remove() }
 
-        for port in UInt16(1) ... 12 {
+        for port in UInt16(1)...12 {
             fixture.log.record(.sessionListening(port: port))
         }
 
@@ -178,7 +178,7 @@ struct LoggingTests {
         let fixture = try makeFixture(maxFileSize: 220, maxRotatedFiles: 3)
         defer { fixture.remove() }
 
-        for port in UInt16(1) ... 12 {
+        for port in UInt16(1)...12 {
             fixture.log.record(.sessionListening(port: port))
         }
         let staleRotation = fixture.log.logDirectory.appendingPathComponent("Matcha.jsonl.99")

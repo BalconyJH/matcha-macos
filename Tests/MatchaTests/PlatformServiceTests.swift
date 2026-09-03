@@ -1,8 +1,7 @@
 import Foundation
-import Testing
-
 import MatchaCore
 import MatchaProtocol
+import Testing
 
 @Suite("Platform Service")
 struct PlatformServiceTests {
@@ -337,7 +336,7 @@ struct PlatformServiceTests {
             )
         }
         #expect(events.count == 1)
-        guard case let .message(message) = events.first?.payload else {
+        guard case .message(let message) = events.first?.payload else {
             Issue.record("Expected a message event")
             return
         }
@@ -369,7 +368,7 @@ struct PlatformServiceTests {
             try await fixture.platform.resolveRequest(flag: request.flag, approve: true, remark: "Buddy")
         }
 
-        guard case let .friendAdded(userID) = events.first?.payload else {
+        guard case .friendAdded(let userID) = events.first?.payload else {
             Issue.record("Expected a friendAdded event")
             return
         }
@@ -393,14 +392,16 @@ struct PlatformServiceTests {
             )
         }
 
-        #expect(try await fixture.store.friendship(
-            userID: fixture.bot.id,
-            friendID: fixture.member.id
-        ) != nil)
-        #expect(try await fixture.store.friendship(
-            userID: fixture.member.id,
-            friendID: fixture.bot.id
-        ) != nil)
+        #expect(
+            try await fixture.store.friendship(
+                userID: fixture.bot.id,
+                friendID: fixture.member.id
+            ) != nil)
+        #expect(
+            try await fixture.store.friendship(
+                userID: fixture.member.id,
+                friendID: fixture.bot.id
+            ) != nil)
         #expect(Set(events.map(\.selfID)) == [fixture.bot.id, fixture.member.id])
     }
 
@@ -430,17 +431,19 @@ struct PlatformServiceTests {
             )
         }
 
-        #expect(try await fixture.store.friendship(
-            userID: fixture.bot.id,
-            friendID: fixture.member.id
-        ) == nil)
-        #expect(try await fixture.store.friendship(
-            userID: fixture.member.id,
-            friendID: fixture.bot.id
-        ) == nil)
+        #expect(
+            try await fixture.store.friendship(
+                userID: fixture.bot.id,
+                friendID: fixture.member.id
+            ) == nil)
+        #expect(
+            try await fixture.store.friendship(
+                userID: fixture.member.id,
+                friendID: fixture.bot.id
+            ) == nil)
         #expect(try await fixture.store.messages(in: chat).map(\.id) == [message.id])
         #expect(events.first?.selfID == fixture.bot.id)
-        guard case let .friendRemoved(userID) = events.first?.payload else {
+        guard case .friendRemoved(let userID) = events.first?.payload else {
             Issue.record("Expected a friendRemoved event")
             return
         }
@@ -474,7 +477,7 @@ struct PlatformServiceTests {
             try await fixture.platform.resolveRequest(flag: request.flag, approve: true)
         }
 
-        guard case let .groupMemberAdded(change) = events.first?.payload else {
+        guard case .groupMemberAdded(let change) = events.first?.payload else {
             Issue.record("Expected a groupMemberAdded event")
             return
         }

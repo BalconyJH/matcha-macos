@@ -89,7 +89,7 @@ struct StoreTests {
         let groupChat = Chat(scene: .group, peerID: fixture.group.id, selfID: fixture.bob.id)
         let privateChat = Chat(scene: .friend, peerID: fixture.alice.id, selfID: fixture.bob.id)
 
-        for index in 1 ... 3 {
+        for index in 1...3 {
             let stored = try await fixture.store.append(
                 Message(
                     scene: .group,
@@ -156,7 +156,7 @@ struct StoreTests {
     @Test("History pagination moves backward")
     func historyPaging() async throws {
         let fixture = try await makeFixture()
-        for index in 1 ... 10 {
+        for index in 1...10 {
             _ = try await fixture.store.append(
                 Message(
                     scene: .group,

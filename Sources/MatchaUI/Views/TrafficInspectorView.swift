@@ -317,8 +317,8 @@ private enum DirectionFilter: String, CaseIterable, Identifiable {
 
 // MARK: - Presentation
 
-private extension TrafficEntry {
-    var symbolName: String {
+extension TrafficEntry {
+    fileprivate var symbolName: String {
         switch direction {
         case .inboundCall: return "arrow.down.circle"
         case .outboundEvent: return "arrow.up.circle"
@@ -328,7 +328,7 @@ private extension TrafficEntry {
 
     /// Red marks a reply that carried a non-zero return code, which is the thing
     /// worth spotting while scanning the log.
-    var tint: Color {
+    fileprivate var tint: Color {
         if isFailedReply { return .red }
         switch direction {
         case .inboundCall: return .blue
@@ -340,7 +340,7 @@ private extension TrafficEntry {
     /// Read from the payload rather than tracked separately, because the envelope
     /// carries the code the framework actually received. Both protocols use zero for
     /// success, and Milky adds an `ok` flag alongside it.
-    var isFailedReply: Bool {
+    fileprivate var isFailedReply: Bool {
         guard direction == .reply else { return false }
         if let retcode = payload["retcode"]?.intValue, retcode != 0 { return true }
         if let ok = payload["ok"]?.boolValue, !ok { return true }

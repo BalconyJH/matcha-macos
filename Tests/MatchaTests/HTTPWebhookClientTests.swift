@@ -49,7 +49,7 @@ struct HTTPWebhookClientTests {
             try await client.post(Data("{}".utf8))
             Issue.record("Expected the 401 response to fail")
         } catch let error as HTTPWebhookClientError {
-            guard case let .rejected(statusCode) = error else {
+            guard case .rejected(let statusCode) = error else {
                 Issue.record("Expected rejected, got \(error)")
                 return
             }
@@ -90,7 +90,7 @@ struct HTTPWebhookClientTests {
             HTTPResponse(
                 status: 302,
                 headers: [
-                    ("Location", "http://127.0.0.1:\(redirectedPort)/captured"),
+                    ("Location", "http://127.0.0.1:\(redirectedPort)/captured")
                 ]
             )
         }
@@ -148,7 +148,7 @@ struct HTTPWebhookClientTests {
             try await client.post(Data("{}".utf8))
         }
 
-        for _ in 0 ..< 300 {
+        for _ in 0..<300 {
             if await capture.request != nil { break }
             try await Task.sleep(for: .milliseconds(10))
         }
@@ -169,8 +169,8 @@ struct HTTPWebhookClientTests {
         handler: @escaping HTTPServer.Handler
     ) async throws -> (HTTPServer, UInt16) {
         var lastError: (any Error)?
-        for _ in 0 ..< 20 {
-            let port = UInt16.random(in: 30_000 ... 60_000)
+        for _ in 0..<20 {
+            let port = UInt16.random(in: 30_000...60_000)
             let server = HTTPServer(port: port, handler: handler)
             do {
                 try await server.start()

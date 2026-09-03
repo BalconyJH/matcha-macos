@@ -254,7 +254,8 @@ struct UserSelectionSheet: View {
         if environment.users.isEmpty { return "Create a persona first." }
         switch purpose {
         case .friend:
-            return environment.botUserID == nil ? "Select a bot account first." : "No new friend candidates are available."
+            return environment.botUserID == nil
+                ? "Select a bot account first." : "No new friend candidates are available."
         case .group:
             if groupIsFull { return "This group has reached its member limit." }
             if !operatorCanInvite { return "The current sending identity is not a member of this group." }
@@ -278,7 +279,7 @@ struct UserSelectionSheet: View {
             switch purpose {
             case .friend:
                 break
-            case let .group(groupID):
+            case .group(let groupID):
                 let roster = try await environment.groupMembers(in: groupID)
                 excludedUserIDs = Set(roster.map(\.userID))
                 operatorCanInvite = environment.activeUserID.map(excludedUserIDs.contains) == true
@@ -302,7 +303,7 @@ struct UserSelectionSheet: View {
                 case .friend:
                     let chat = try await environment.addFriend(with: selectedUserID)
                     environment.selectChat(chat)
-                case let .group(groupID):
+                case .group(let groupID):
                     try await environment.addGroupMember(selectedUserID, to: groupID)
                 }
                 dismiss()
@@ -496,7 +497,7 @@ struct GroupMembersSheet: View {
 
     private func canRemove(_ member: GroupMember) -> Bool {
         guard let activeUserID = environment.activeUserID, activeUserID != member.userID,
-              let actor = roster.first(where: { $0.userID == activeUserID })
+            let actor = roster.first(where: { $0.userID == activeUserID })
         else { return false }
         return actor.role > .member && actor.role > member.role
     }
@@ -576,8 +577,8 @@ extension User.Sex {
     }
 }
 
-private extension GroupMember.Role {
-    var label: String {
+extension GroupMember.Role {
+    fileprivate var label: String {
         switch self {
         case .owner: return "Owner"
         case .admin: return "Admin"

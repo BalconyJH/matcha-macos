@@ -18,15 +18,15 @@ public enum JSONValue: Sendable, Hashable {
 
 // MARK: - Reading
 
-public extension JSONValue {
-    var isNull: Bool { self == .null }
+extension JSONValue {
+    public var isNull: Bool { self == .null }
 
-    var boolValue: Bool? {
+    public var boolValue: Bool? {
         switch self {
-        case let .bool(b): return b
+        case .bool(let b): return b
         // OneBot implementations are loose with booleans on the wire.
-        case let .number(n): return n != 0
-        case let .string(s):
+        case .number(let n): return n != 0
+        case .string(let s):
             switch s.lowercased() {
             case "true", "yes", "1": return true
             case "false", "no", "0": return false
@@ -36,56 +36,60 @@ public extension JSONValue {
         }
     }
 
-    var doubleValue: Double? {
+    public var doubleValue: Double? {
         switch self {
-        case let .number(n): return n
-        case let .string(s): return Double(s)
-        case let .bool(b): return b ? 1 : 0
+        case .number(let n): return n
+        case .string(let s): return Double(s)
+        case .bool(let b): return b ? 1 : 0
         default: return nil
         }
     }
 
-    var intValue: Int? {
-        guard let d = doubleValue, d.isFinite, d >= -9007199254740992, d <= 9007199254740992 else { return nil }
+    public var intValue: Int? {
+        guard let d = doubleValue, d.isFinite, d >= -9_007_199_254_740_992, d <= 9_007_199_254_740_992 else {
+            return nil
+        }
         return Int(d)
     }
 
-    var int64Value: Int64? {
-        guard let d = doubleValue, d.isFinite, d >= -9007199254740992, d <= 9007199254740992 else { return nil }
+    public var int64Value: Int64? {
+        guard let d = doubleValue, d.isFinite, d >= -9_007_199_254_740_992, d <= 9_007_199_254_740_992 else {
+            return nil
+        }
         return Int64(d)
     }
 
     /// Numbers stringify because peer IDs cross the wire as either form:
     /// OneBot v11 sends `user_id` as an integer, v12 and Milky as a string.
-    var stringValue: String? {
+    public var stringValue: String? {
         switch self {
-        case let .string(s): return s
-        case let .number(n):
+        case .string(let s): return s
+        case .number(let n):
             if let i = int64Value, Double(i) == n { return String(i) }
             return String(n)
-        case let .bool(b): return b ? "true" : "false"
+        case .bool(let b): return b ? "true" : "false"
         default: return nil
         }
     }
 
-    var arrayValue: [JSONValue]? {
-        if case let .array(a) = self { return a }
+    public var arrayValue: [JSONValue]? {
+        if case .array(let a) = self { return a }
         return nil
     }
 
-    var objectValue: [String: JSONValue]? {
-        if case let .object(o) = self { return o }
+    public var objectValue: [String: JSONValue]? {
+        if case .object(let o) = self { return o }
         return nil
     }
 
     /// Member access on an object, `nil` for any other case.
-    subscript(key: String) -> JSONValue? {
-        guard case let .object(o) = self else { return nil }
+    public subscript(key: String) -> JSONValue? {
+        guard case .object(let o) = self else { return nil }
         return o[key]
     }
 
-    subscript(index: Int) -> JSONValue? {
-        guard case let .array(a) = self, a.indices.contains(index) else { return nil }
+    public subscript(index: Int) -> JSONValue? {
+        guard case .array(let a) = self, a.indices.contains(index) else { return nil }
         return a[index]
     }
 }
@@ -116,14 +120,14 @@ extension JSONValue: Codable {
         var c = encoder.singleValueContainer()
         switch self {
         case .null: try c.encodeNil()
-        case let .bool(b): try c.encode(b)
-        case let .number(n):
+        case .bool(let b): try c.encode(b)
+        case .number(let n):
             // Emit whole numbers without a `.0` tail; OneBot peers expect
             // integral IDs and timestamps to look like integers.
             if let i = int64Value, Double(i) == n { try c.encode(i) } else { try c.encode(n) }
-        case let .string(s): try c.encode(s)
-        case let .array(a): try c.encode(a)
-        case let .object(o): try c.encode(o)
+        case .string(let s): try c.encode(s)
+        case .array(let a): try c.encode(a)
+        case .object(let o): try c.encode(o)
         }
     }
 }
@@ -162,41 +166,42 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 
 // MARK: - Building
 
-public extension JSONValue {
+extension JSONValue {
     /// Builds an object, dropping `nil` members so optional fields stay absent
     /// rather than becoming explicit nulls — some peers reject `null` where they
     /// expect a missing key.
-    static func compactObject(_ members: [String: JSONValue?]) -> JSONValue {
+    public static func compactObject(_ members: [String: JSONValue?]) -> JSONValue {
         .object(members.compactMapValues { $0 })
     }
 
-    init(_ value: Int) { self = .number(Double(value)) }
-    init(_ value: Int64) { self = .number(Double(value)) }
-    init(_ value: Double) { self = .number(value) }
-    init(_ value: Bool) { self = .bool(value) }
-    init(_ value: String) { self = .string(value) }
+    public init(_ value: Int) { self = .number(Double(value)) }
+    public init(_ value: Int64) { self = .number(Double(value)) }
+    public init(_ value: Double) { self = .number(value) }
+    public init(_ value: Bool) { self = .bool(value) }
+    public init(_ value: String) { self = .string(value) }
 }
 
 // MARK: - Serialization
 
-public extension JSONValue {
-    static func decode(from data: Data) throws -> JSONValue {
+extension JSONValue {
+    public static func decode(from data: Data) throws -> JSONValue {
         try JSONDecoder().decode(JSONValue.self, from: data)
     }
 
-    func encoded(prettyPrinted: Bool = false) throws -> Data {
+    public func encoded(prettyPrinted: Bool = false) throws -> Data {
         let enc = JSONEncoder()
-        enc.outputFormatting = prettyPrinted ? [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes] : [.withoutEscapingSlashes]
+        enc.outputFormatting =
+            prettyPrinted ? [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes] : [.withoutEscapingSlashes]
         return try enc.encode(self)
     }
 
     /// Compact JSON text; used for wire frames.
-    func jsonText() throws -> String {
+    public func jsonText() throws -> String {
         String(decoding: try encoded(), as: UTF8.self)
     }
 
     /// Indented JSON text for the raw-event inspector.
-    var prettyText: String {
+    public var prettyText: String {
         (try? String(decoding: encoded(prettyPrinted: true), as: UTF8.self)) ?? "<unencodable>"
     }
 }

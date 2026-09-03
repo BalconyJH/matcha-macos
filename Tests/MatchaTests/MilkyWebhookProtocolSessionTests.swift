@@ -1,9 +1,9 @@
 import Foundation
-import Testing
-
 import MatchaCore
 import MatchaMilky
 import MatchaProtocol
+import Testing
+
 @testable import MatchaTransport
 
 @Suite("Milky Protocol Service")
@@ -162,8 +162,8 @@ struct MilkyWebhookProtocolSessionTests {
         var verifiedUnboundPort = false
         var lastBindError: (any Error)?
 
-        for _ in 0 ..< 20 where !verifiedUnboundPort {
-            let port = UInt16.random(in: 30_000 ... 60_000)
+        for _ in 0..<20 where !verifiedUnboundPort {
+            let port = UInt16.random(in: 30_000...60_000)
             let session = makeSession(
                 fixture: fixture,
                 apiPort: port,
@@ -177,7 +177,7 @@ struct MilkyWebhookProtocolSessionTests {
                 await session.stop()
                 return
             } catch let error as TransportError {
-                guard case let .invalidURL(value) = error else {
+                guard case .invalidURL(let value) = error else {
                     Issue.record("Expected invalidURL, got \(error)")
                     await session.stop()
                     return
@@ -211,8 +211,8 @@ struct MilkyWebhookProtocolSessionTests {
         var verifiedUnboundPort = false
         var lastBindError: (any Error)?
 
-        for _ in 0 ..< 20 where !verifiedUnboundPort {
-            let port = UInt16.random(in: 30_000 ... 60_000)
+        for _ in 0..<20 where !verifiedUnboundPort {
+            let port = UInt16.random(in: 30_000...60_000)
             let session = ProtocolSession(
                 implementation: WebhookTestWebSocketOnlyImplementation(),
                 platform: platform,
@@ -231,7 +231,7 @@ struct MilkyWebhookProtocolSessionTests {
                 return
             } catch let error as ProtocolSessionError {
                 switch error {
-                case let .unsupportedTransport(identifier, transport):
+                case .unsupportedTransport(let identifier, let transport):
                     #expect(identifier == WebhookTestWebSocketOnlyImplementation.identifier)
                     #expect(transport == .milkyService)
                 }
@@ -280,7 +280,8 @@ struct MilkyWebhookProtocolSessionTests {
         let legacyWebhook = try JSONDecoder().decode(
             ConnectionSettings.self,
             from: Data(
-                #"{"transport":"milkyWebhook","host":"127.0.0.1","port":5700,"milkyWebhookURL":"https://legacy.example/milky/"}"#.utf8
+                #"{"transport":"milkyWebhook","host":"127.0.0.1","port":5700,"milkyWebhookURL":"https://legacy.example/milky/"}"#
+                    .utf8
             )
         )
         #expect(legacyWebhook.transport == .milkyService)
@@ -373,8 +374,8 @@ struct MilkyWebhookProtocolSessionTests {
         token: String
     ) async throws -> (ProtocolSession, UInt16) {
         var lastError: (any Error)?
-        for _ in 0 ..< 20 {
-            let port = UInt16.random(in: 30_000 ... 60_000)
+        for _ in 0..<20 {
+            let port = UInt16.random(in: 30_000...60_000)
             let session = makeSession(
                 fixture: fixture,
                 apiPort: port,
@@ -397,8 +398,8 @@ struct MilkyWebhookProtocolSessionTests {
         handler: @escaping HTTPServer.Handler
     ) async throws -> (HTTPServer, UInt16) {
         var lastError: (any Error)?
-        for _ in 0 ..< 20 {
-            let port = UInt16.random(in: 30_000 ... 60_000)
+        for _ in 0..<20 {
+            let port = UInt16.random(in: 30_000...60_000)
             let server = HTTPServer(port: port, handler: handler)
             do {
                 try await server.start()
@@ -416,7 +417,7 @@ struct MilkyWebhookProtocolSessionTests {
         count: Int,
         description: String
     ) async throws -> [HTTPRequest] {
-        for _ in 0 ..< 300 {
+        for _ in 0..<300 {
             let requests = await receiver.requests
             if requests.count >= count { return requests }
             try await Task.sleep(for: .milliseconds(10))
@@ -430,9 +431,9 @@ struct MilkyWebhookProtocolSessionTests {
         try await withTimeout(waitingFor: "the Milky event consumer to connect") {
             for await update in client.updates {
                 switch update {
-                case let .connected(connection):
+                case .connected(let connection):
                     return connection
-                case let .failed(error):
+                case .failed(let error):
                     throw error
                 case .reconnecting:
                     continue

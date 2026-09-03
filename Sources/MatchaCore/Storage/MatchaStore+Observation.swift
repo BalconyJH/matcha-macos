@@ -4,36 +4,36 @@ import Foundation
 /// committed writes. The concrete persistence engine stays out of the public API.
 public typealias StoreObservation<Value: Sendable> = AsyncThrowingStream<Value, any Error>
 
-public extension MatchaStore {
-    func observeUsers() -> StoreObservation<[User]> {
+extension MatchaStore {
+    public func observeUsers() -> StoreObservation<[User]> {
         observation(for: .users) { [self] in try await allUsers() }
     }
 
-    func observeGroups() -> StoreObservation<[Group]> {
+    public func observeGroups() -> StoreObservation<[Group]> {
         observation(for: .groups) { [self] in try await allGroups() }
     }
 
-    func observeMessages(in chat: Chat, limit: Int = 200) -> StoreObservation<[Message]> {
+    public func observeMessages(in chat: Chat, limit: Int = 200) -> StoreObservation<[Message]> {
         observation(for: .messages) { [self] in try await messages(in: chat, limit: limit) }
     }
 
-    func observeMembers(groupID: String) -> StoreObservation<[(member: GroupMember, user: User)]> {
+    public func observeMembers(groupID: String) -> StoreObservation<[(member: GroupMember, user: User)]> {
         observation(for: .members) { [executor] in
             try await executor.memberRoster(groupID: groupID)
         }
     }
 
-    func observeFriendships(userID: String) -> StoreObservation<[Friendship]> {
+    public func observeFriendships(userID: String) -> StoreObservation<[Friendship]> {
         observation(for: .friendships) { [self] in
             try await friendships(userID: userID)
         }
     }
 
-    func observePendingRequests(selfID: String) -> StoreObservation<[PendingRequest]> {
+    public func observePendingRequests(selfID: String) -> StoreObservation<[PendingRequest]> {
         observation(for: .requests) { [self] in try await pendingRequests(selfID: selfID) }
     }
 
-    func observeConversations(selfID: String) -> StoreObservation<[ConversationSummary]> {
+    public func observeConversations(selfID: String) -> StoreObservation<[ConversationSummary]> {
         observation(for: .conversations) { [executor] in
             try await executor.conversationSummaries(selfID: selfID)
         }

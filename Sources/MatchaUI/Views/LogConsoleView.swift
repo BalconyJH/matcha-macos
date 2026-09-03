@@ -288,9 +288,10 @@ public struct LogConsoleView: View {
                 Button("Deselect All") {
                     excludedCategories = Set(availableCategories.map(\.token))
                 }
-                .disabled(availableCategories.allSatisfy {
-                    excludedCategories.contains($0.token)
-                })
+                .disabled(
+                    availableCategories.allSatisfy {
+                        excludedCategories.contains($0.token)
+                    })
             }
         } label: {
             Label(categoryFilterLabel, systemImage: "tag")
@@ -307,7 +308,7 @@ public struct LogConsoleView: View {
                 let level = record.levelToken
                 let category = record.categoryToken
                 guard !excludedLevels.contains(level),
-                      !excludedCategories.contains(category)
+                    !excludedCategories.contains(category)
                 else { return false }
 
                 guard !normalizedQuery.isEmpty else { return true }
@@ -320,13 +321,15 @@ public struct LogConsoleView: View {
     }
 
     private var availableLevels: [LogFilterOption] {
-        uniqueOptions(model.records.map { record in
-            LogFilterOption(
-                token: record.levelToken,
-                displayLabel: record.levelDisplayLabel,
-                sortOrder: record.levelSortOrder
-            )
-        })
+        uniqueOptions(
+            model.records.map { record in
+                LogFilterOption(
+                    token: record.levelToken,
+                    displayLabel: record.levelDisplayLabel,
+                    sortOrder: record.levelSortOrder
+                )
+            }
+        )
         .sorted {
             if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
             return $0.displayLabel.localizedStandardCompare($1.displayLabel) == .orderedAscending
@@ -334,13 +337,15 @@ public struct LogConsoleView: View {
     }
 
     private var availableCategories: [LogFilterOption] {
-        uniqueOptions(model.records.map { record in
-            LogFilterOption(
-                token: record.categoryToken,
-                displayLabel: record.categoryDisplayLabel,
-                sortOrder: 0
-            )
-        })
+        uniqueOptions(
+            model.records.map { record in
+                LogFilterOption(
+                    token: record.categoryToken,
+                    displayLabel: record.categoryDisplayLabel,
+                    sortOrder: 0
+                )
+            }
+        )
         .sorted {
             $0.displayLabel.localizedStandardCompare($1.displayLabel) == .orderedAscending
         }

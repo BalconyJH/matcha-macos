@@ -1,7 +1,7 @@
 import Foundation
+import MatchaCore
 import Testing
 
-import MatchaCore
 @testable import MatchaLogging
 @testable import MatchaUI
 
@@ -15,10 +15,12 @@ struct ChatNavigationTests {
         #expect(chat.counterpartID(for: "user") == "bot")
         #expect(chat.counterpartID(for: "bot") == "user")
         #expect(chat.counterpartID(for: "third-party") == nil)
-        #expect(Chat(scene: .friend, peerID: "bot", selfID: "bot")
-            .counterpartID(for: "bot") == nil)
-        #expect(Chat(scene: .group, peerID: "group", selfID: "bot")
-            .counterpartID(for: "bot") == nil)
+        #expect(
+            Chat(scene: .friend, peerID: "bot", selfID: "bot")
+                .counterpartID(for: "bot") == nil)
+        #expect(
+            Chat(scene: .group, peerID: "group", selfID: "bot")
+                .counterpartID(for: "bot") == nil)
         #expect(
             ComposerDraftKey(chat: chat, senderID: "user")
                 != ComposerDraftKey(chat: chat, senderID: "bot")
@@ -108,7 +110,7 @@ struct ChatNavigationTests {
         try await fixture.environment.store.save(firstBot)
         try await fixture.environment.store.save(secondBot)
 
-        for _ in 0 ..< 100 where fixture.environment.users.count < 2 {
+        for _ in 0..<100 where fixture.environment.users.count < 2 {
             await Task.yield()
         }
         #expect(fixture.environment.botUserID == secondBot.id)
@@ -159,7 +161,7 @@ struct ChatNavigationTests {
         for participant in [user, other, bot] {
             try await fixture.environment.store.save(participant)
         }
-        for _ in 0 ..< 100 where fixture.environment.users.count < 3 {
+        for _ in 0..<100 where fixture.environment.users.count < 3 {
             await Task.yield()
         }
 

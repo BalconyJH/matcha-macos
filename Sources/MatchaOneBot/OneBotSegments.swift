@@ -54,10 +54,10 @@ public struct OneBotSegmentCoder: Sendable {
 
     private func encode(_ segment: MessageSegment) async -> JSONValue? {
         switch segment {
-        case let .text(text):
+        case .text(let text):
             return Self.segment("text", ["text": .string(text)])
 
-        case let .mention(userID):
+        case .mention(let userID):
             switch version {
             case .v11:
                 // v11 folds "@everyone" into the same segment with a sentinel value.
@@ -67,12 +67,12 @@ public struct OneBotSegmentCoder: Sendable {
                 return Self.segment("mention", ["user_id": .string(userID)])
             }
 
-        case let .face(id, _):
+        case .face(let id, _):
             // v12 has no face segment; dropping it loses less than inventing one.
             guard version == .v11 else { return nil }
             return Self.segment("face", ["id": .string(id)])
 
-        case let .image(asset):
+        case .image(let asset):
             let file = await assetResolver.reference(for: asset, version: version)
             switch version {
             case .v11:
@@ -81,7 +81,7 @@ public struct OneBotSegmentCoder: Sendable {
                 return Self.segment("image", ["file_id": .string(file.identifier)])
             }
 
-        case let .record(asset, _):
+        case .record(let asset, _):
             let file = await assetResolver.reference(for: asset, version: version)
             switch version {
             case .v11:
@@ -90,7 +90,7 @@ public struct OneBotSegmentCoder: Sendable {
                 return Self.segment("voice", ["file_id": .string(file.identifier)])
             }
 
-        case let .video(asset):
+        case .video(let asset):
             let file = await assetResolver.reference(for: asset, version: version)
             switch version {
             case .v11:
@@ -99,7 +99,7 @@ public struct OneBotSegmentCoder: Sendable {
                 return Self.segment("video", ["file_id": .string(file.identifier)])
             }
 
-        case let .file(asset):
+        case .file(let asset):
             let file = await assetResolver.reference(for: asset, version: version)
             switch version {
             case .v11:
@@ -109,7 +109,7 @@ public struct OneBotSegmentCoder: Sendable {
                 return Self.segment("file", ["file_id": .string(file.identifier)])
             }
 
-        case let .reply(messageID):
+        case .reply(let messageID):
             switch version {
             case .v11:
                 return Self.segment("reply", ["id": .string(messageID)])
@@ -117,15 +117,15 @@ public struct OneBotSegmentCoder: Sendable {
                 return Self.segment("reply", ["message_id": .string(messageID)])
             }
 
-        case let .poke(userID):
+        case .poke(let userID):
             guard version == .v11 else { return nil }
             return Self.segment("poke", ["type": "1", "id": .string(userID ?? "0")])
 
-        case let .forward(id, _):
+        case .forward(let id, _):
             guard version == .v11 else { return nil }
             return Self.segment("forward", ["id": .string(id)])
 
-        case let .unsupported(type, payload):
+        case .unsupported(let type, let payload):
             // Pass through anything a peer sent us that we did not model, so a
             // round-trip does not silently drop it.
             if let object = payload.objectValue, object["type"] != nil {

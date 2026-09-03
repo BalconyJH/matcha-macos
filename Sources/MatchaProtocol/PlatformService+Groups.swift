@@ -6,10 +6,10 @@ import MatchaCore
 /// Permission rules are enforced here rather than in any protocol implementation, so a framework
 /// gets the same refusal whichever protocol it speaks — and discovers, as it would
 /// in production, that it lacks the authority for an operation.
-public extension PlatformService {
+extension PlatformService {
     /// Adds a member and announces the join.
     @discardableResult
-    func addMember(
+    public func addMember(
         groupID: String,
         userID: String,
         operatorID: String? = nil,
@@ -22,7 +22,7 @@ public extension PlatformService {
             throw PlatformError.userNotFound(userID)
         }
         if let operatorID,
-           try await store.member(groupID: groupID, userID: operatorID) == nil
+            try await store.member(groupID: groupID, userID: operatorID) == nil
         {
             throw PlatformError.notAMember(groupID: groupID, userID: operatorID)
         }
@@ -48,7 +48,7 @@ public extension PlatformService {
     }
 
     /// Removes a member, either by their own choice or by an administrator.
-    func removeMember(
+    public func removeMember(
         groupID: String,
         userID: String,
         operatorID: String,
@@ -74,7 +74,7 @@ public extension PlatformService {
     }
 
     /// Grants or revokes administrator status. Only the owner may do this.
-    func setAdmin(groupID: String, userID: String, operatorID: String, granted: Bool) async throws {
+    public func setAdmin(groupID: String, userID: String, operatorID: String, granted: Bool) async throws {
         guard var member = try await store.member(groupID: groupID, userID: userID) else {
             throw PlatformError.notAMember(groupID: groupID, userID: userID)
         }
@@ -98,7 +98,7 @@ public extension PlatformService {
     }
 
     /// Mutes or unmutes one member. A zero duration lifts the mute.
-    func muteMember(groupID: String, userID: String, operatorID: String, duration: TimeInterval) async throws {
+    public func muteMember(groupID: String, userID: String, operatorID: String, duration: TimeInterval) async throws {
         guard var member = try await store.member(groupID: groupID, userID: userID) else {
             throw PlatformError.notAMember(groupID: groupID, userID: userID)
         }
@@ -124,7 +124,7 @@ public extension PlatformService {
     }
 
     /// Mutes or unmutes everyone.
-    func setWholeMute(groupID: String, operatorID: String, muted: Bool) async throws {
+    public func setWholeMute(groupID: String, operatorID: String, muted: Bool) async throws {
         guard var group = try await store.group(id: groupID) else {
             throw PlatformError.groupNotFound(groupID)
         }
@@ -145,7 +145,7 @@ public extension PlatformService {
     }
 
     /// Renames a group.
-    func setGroupName(groupID: String, operatorID: String, name: String) async throws {
+    public func setGroupName(groupID: String, operatorID: String, name: String) async throws {
         guard var group = try await store.group(id: groupID) else {
             throw PlatformError.groupNotFound(groupID)
         }
@@ -170,7 +170,7 @@ public extension PlatformService {
     /// Sets a member's group-specific display name.
     ///
     /// Members may edit their own; administrators may edit others'.
-    func setMemberCard(groupID: String, userID: String, operatorID: String, card: String) async throws {
+    public func setMemberCard(groupID: String, userID: String, operatorID: String, card: String) async throws {
         guard var member = try await store.member(groupID: groupID, userID: userID) else {
             throw PlatformError.notAMember(groupID: groupID, userID: userID)
         }
@@ -182,7 +182,7 @@ public extension PlatformService {
     }
 
     /// Sets a member's honorific. Owner only, as on the real platform.
-    func setMemberTitle(groupID: String, userID: String, operatorID: String, title: String) async throws {
+    public func setMemberTitle(groupID: String, userID: String, operatorID: String, title: String) async throws {
         guard var member = try await store.member(groupID: groupID, userID: userID) else {
             throw PlatformError.notAMember(groupID: groupID, userID: userID)
         }
@@ -194,7 +194,7 @@ public extension PlatformService {
     }
 
     /// Sends a nudge ("poke").
-    func poke(scene: ChatScene, peerID: String, senderID: String, targetID: String) async throws {
+    public func poke(scene: ChatScene, peerID: String, senderID: String, targetID: String) async throws {
         if scene == .group {
             guard try await store.member(groupID: peerID, userID: targetID) != nil else {
                 throw PlatformError.notAMember(groupID: peerID, userID: targetID)
@@ -211,7 +211,7 @@ public extension PlatformService {
     }
 
     /// Adds or removes a reaction on a message.
-    func react(messageID: String, userID: String, reaction: String, added: Bool) async throws {
+    public func react(messageID: String, userID: String, reaction: String, added: Bool) async throws {
         guard let message = try await store.message(id: messageID) else {
             throw PlatformError.messageNotFound(messageID)
         }

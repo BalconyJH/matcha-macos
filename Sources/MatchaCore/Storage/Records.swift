@@ -7,11 +7,11 @@ enum StorePersistenceError: Error, LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case let .invalidRawValue(type, value):
+        case .invalidRawValue(let type, let value):
             return "Invalid \(type) value in the database: \(value)"
-        case let .missingUser(id):
+        case .missingUser(let id):
             return "Cannot write a record that references a missing user: \(id)"
-        case let .missingGroup(id):
+        case .missingGroup(let id):
             return "Cannot write a record that references a missing group: \(id)"
         }
     }
@@ -352,7 +352,7 @@ extension PendingRequest.Resolution: Codable {
         switch self {
         case .accepted:
             try container.encode("accepted", forKey: .state)
-        case let .rejected(reason):
+        case .rejected(let reason):
             try container.encode("rejected", forKey: .state)
             try container.encode(reason, forKey: .reason)
         }

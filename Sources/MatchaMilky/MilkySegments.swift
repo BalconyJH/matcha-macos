@@ -34,86 +34,101 @@ struct MilkySegmentCoder: Sendable {
 
     private func encodeIncoming(_ segment: MessageSegment) async -> JSONValue? {
         switch segment {
-        case let .text(text):
+        case .text(let text):
             return Self.segment("text", ["text": .string(text)])
 
-        case let .mention(userID):
+        case .mention(let userID):
             guard let userID else { return Self.segment("mention_all", [:]) }
             let name = await assetResolver.displayName(for: userID)
-            return Self.segment("mention", [
-                "user_id": uin(userID),
-                // Since 1.2, with the leading "@" stripped.
-                "name": .string(name),
-            ])
+            return Self.segment(
+                "mention",
+                [
+                    "user_id": uin(userID),
+                    // Since 1.2, with the leading "@" stripped.
+                    "name": .string(name),
+                ])
 
-        case let .face(id, _):
+        case .face(let id, _):
             return Self.segment("face", ["face_id": .string(id), "is_large": false])
 
-        case let .image(asset):
+        case .image(let asset):
             let resource = await assetResolver.resource(for: asset)
-            return Self.segment("image", [
-                "resource_id": .string(resource.resourceID),
-                "temp_url": .string(resource.tempURL),
-                "width": .number(Double(resource.width ?? 0)),
-                "height": .number(Double(resource.height ?? 0)),
-                "summary": .string(asset.name),
-                "sub_type": "normal",
-            ])
+            return Self.segment(
+                "image",
+                [
+                    "resource_id": .string(resource.resourceID),
+                    "temp_url": .string(resource.tempURL),
+                    "width": .number(Double(resource.width ?? 0)),
+                    "height": .number(Double(resource.height ?? 0)),
+                    "summary": .string(asset.name),
+                    "sub_type": "normal",
+                ])
 
-        case let .record(asset, duration):
+        case .record(let asset, let duration):
             let resource = await assetResolver.resource(for: asset)
-            return Self.segment("record", [
-                "resource_id": .string(resource.resourceID),
-                "temp_url": .string(resource.tempURL),
-                "duration": MilkyEntityEncoder.seconds(duration ?? 0),
-            ])
+            return Self.segment(
+                "record",
+                [
+                    "resource_id": .string(resource.resourceID),
+                    "temp_url": .string(resource.tempURL),
+                    "duration": MilkyEntityEncoder.seconds(duration ?? 0),
+                ])
 
-        case let .video(asset):
+        case .video(let asset):
             let resource = await assetResolver.resource(for: asset)
-            return Self.segment("video", [
-                "resource_id": .string(resource.resourceID),
-                "temp_url": .string(resource.tempURL),
-                "width": .number(Double(resource.width ?? 0)),
-                "height": .number(Double(resource.height ?? 0)),
-                "duration": 0,
-            ])
+            return Self.segment(
+                "video",
+                [
+                    "resource_id": .string(resource.resourceID),
+                    "temp_url": .string(resource.tempURL),
+                    "width": .number(Double(resource.width ?? 0)),
+                    "height": .number(Double(resource.height ?? 0)),
+                    "duration": 0,
+                ])
 
-        case let .file(asset):
-            return Self.segment("file", [
-                "file_id": .string(asset.id),
-                "file_name": .string(asset.name),
-                "file_size": .number(Double(asset.byteCount)),
-            ])
+        case .file(let asset):
+            return Self.segment(
+                "file",
+                [
+                    "file_id": .string(asset.id),
+                    "file_name": .string(asset.name),
+                    "file_size": .number(Double(asset.byteCount)),
+                ])
 
-        case let .reply(messageID):
+        case .reply(let messageID):
             // Milky keys replies by sequence, not by message ID, so the referenced
             // message has to be looked up.
             guard let reference = await assetResolver.replyReference(messageID: messageID) else {
                 return nil
             }
-            return Self.segment("reply", [
-                "message_seq": .number(Double(reference.seq)),
-                "sender_id": uin(reference.senderID),
-                "time": MilkyEntityEncoder.timestamp(reference.time),
-                "segments": .array(await encodeIncoming(reference.content)),
-            ])
+            return Self.segment(
+                "reply",
+                [
+                    "message_seq": .number(Double(reference.seq)),
+                    "sender_id": uin(reference.senderID),
+                    "time": MilkyEntityEncoder.timestamp(reference.time),
+                    "segments": .array(await encodeIncoming(reference.content)),
+                ])
 
         case .poke:
             // Nudges are events in Milky (`friend_nudge`/`group_nudge`), never
             // segments.
             return nil
 
-        case let .forward(id, nodes):
-            return Self.segment("forward", [
-                "forward_id": .string(id),
-                "title": "Forwarded messages",
-                "preview": .array(nodes.prefix(4).map { node in
-                    .string("\(node.senderName): \(node.content.textPreview)")
-                }),
-                "summary": .string("View \(nodes.count) forwarded messages"),
-            ])
+        case .forward(let id, let nodes):
+            return Self.segment(
+                "forward",
+                [
+                    "forward_id": .string(id),
+                    "title": "Forwarded messages",
+                    "preview": .array(
+                        nodes.prefix(4).map { node in
+                            .string("\(node.senderName): \(node.content.textPreview)")
+                        }),
+                    "summary": .string("View \(nodes.count) forwarded messages"),
+                ])
 
-        case let .unsupported(type, payload):
+        case .unsupported(let type, let payload):
             // The spec tells clients to downgrade unknown segments to text, so
             // sending one they may not know is safe, but a readable placeholder is
             // more useful than a type name they will render verbatim.

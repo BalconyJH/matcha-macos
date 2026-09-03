@@ -163,9 +163,9 @@ public enum AppLogEvent: Hashable, Sendable {
             "environment.loadFailed"
         case .storeObservationFailed:
             "store.observationFailed"
-        case let .operationCompleted(operation):
+        case .operationCompleted(let operation):
             "app.\(operation.rawValue).completed"
-        case let .operationReturnedError(operation, _):
+        case .operationReturnedError(let operation, _):
             "app.\(operation.rawValue).returnedError"
         case .attachmentImportUnavailable:
             "app.attachment.import.unavailable"
@@ -195,7 +195,7 @@ public enum AppLogEvent: Hashable, Sendable {
     var level: AppLogLevel {
         switch self {
         case .applicationStarted, .environmentLoaded, .operationCompleted,
-             .sessionListening, .sessionReady, .sessionConnecting, .sessionStopped:
+            .sessionListening, .sessionReady, .sessionConnecting, .sessionStopped:
             .info
         case .connectionRequested, .sessionConnected:
             .notice
@@ -204,7 +204,7 @@ public enum AppLogEvent: Hashable, Sendable {
         case .sessionEventDeliveryFailed:
             .warning
         case .environmentLoadFailed, .storeObservationFailed, .sessionFailed,
-             .sessionStartFailed, .operationReturnedError:
+            .sessionStartFailed, .operationReturnedError:
             .error
         }
     }
@@ -218,37 +218,37 @@ public enum AppLogEvent: Hashable, Sendable {
         case .operationCompleted, .operationReturnedError, .attachmentImportUnavailable:
             .application
         case .connectionRequested, .connectionRejected, .sessionListening,
-             .sessionReady, .sessionConnecting, .sessionConnected, .sessionStopped, .sessionFailed,
-             .sessionStartFailed, .sessionEventDeliveryFailed:
+            .sessionReady, .sessionConnecting, .sessionConnected, .sessionStopped, .sessionFailed,
+            .sessionStartFailed, .sessionEventDeliveryFailed:
             .connection
         }
     }
 
     var fields: AppLogFields {
         switch self {
-        case let .environmentLoadFailed(failure),
-             let .storeObservationFailed(failure),
-             let .sessionStartFailed(failure):
+        case .environmentLoadFailed(let failure),
+            .storeObservationFailed(let failure),
+            .sessionStartFailed(let failure):
             AppLogFields(failure: failure)
-        case let .operationCompleted(operation):
+        case .operationCompleted(let operation):
             AppLogFields(operation: operation)
-        case let .operationReturnedError(operation, failure):
+        case .operationReturnedError(let operation, let failure):
             AppLogFields(operation: operation, failure: failure)
         case .attachmentImportUnavailable:
             AppLogFields(operation: .importAttachment)
-        case let .connectionRequested(protocolKind, transportKind, port):
+        case .connectionRequested(let protocolKind, let transportKind, let port):
             AppLogFields(
                 protocolKind: protocolKind,
                 transportKind: transportKind,
                 port: port
             )
-        case let .connectionRejected(rejection):
+        case .connectionRejected(let rejection):
             AppLogFields(connectionRejection: rejection)
-        case let .sessionListening(port), let .sessionReady(port):
+        case .sessionListening(let port), .sessionReady(let port):
             AppLogFields(port: port)
         case .applicationStarted, .environmentLoaded, .sessionConnecting,
-             .sessionConnected, .sessionStopped, .sessionFailed,
-             .sessionEventDeliveryFailed:
+            .sessionConnected, .sessionStopped, .sessionFailed,
+            .sessionEventDeliveryFailed:
             AppLogFields()
         }
     }

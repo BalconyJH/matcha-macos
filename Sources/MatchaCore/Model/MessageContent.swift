@@ -82,48 +82,48 @@ public struct Asset: Hashable, Sendable, Identifiable, Codable {
 
 // MARK: - Plain text projection
 
-public extension MessageSegment {
+extension MessageSegment {
     /// How the segment reads when a message is flattened to a single line, for
     /// sidebar previews and notifications.
-    var textPreview: String {
+    public var textPreview: String {
         switch self {
-        case let .text(t): return t
-        case let .mention(userID): return userID == nil ? "@everyone" : "@\(userID!)"
-        case let .face(_, name): return name.map { "[\($0)]" } ?? "[Emoji]"
+        case .text(let t): return t
+        case .mention(let userID): return userID == nil ? "@everyone" : "@\(userID!)"
+        case .face(_, let name): return name.map { "[\($0)]" } ?? "[Emoji]"
         case .image: return "[Image]"
         case .record: return "[Voice]"
         case .video: return "[Video]"
-        case let .file(asset): return "[File: \(asset.name)]"
+        case .file(let asset): return "[File: \(asset.name)]"
         case .reply: return ""
         case .poke: return "[Nudge]"
         case .forward: return "[Forwarded messages]"
-        case let .unsupported(type, _): return "[\(type)]"
+        case .unsupported(let type, _): return "[\(type)]"
         }
     }
 }
 
-public extension [MessageSegment] {
+extension [MessageSegment] {
     /// Flattened one-line form.
-    var textPreview: String {
+    public var textPreview: String {
         map(\.textPreview).joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// The concatenated plain text only, ignoring every non-text segment. This is
     /// what a bot framework's command matcher usually looks at.
-    var plainText: String {
-        compactMap { if case let .text(t) = $0 { return t } else { return nil } }.joined()
+    public var plainText: String {
+        compactMap { if case .text(let t) = $0 { return t } else { return nil } }.joined()
     }
 
     /// The message this one quotes, if any.
-    var replyTarget: String? {
+    public var replyTarget: String? {
         for segment in self {
-            if case let .reply(id) = segment { return id }
+            if case .reply(let id) = segment { return id }
         }
         return nil
     }
 
     /// Users mentioned, in order. `nil` entries mean "@everyone".
-    var mentions: [String?] {
-        compactMap { if case let .mention(id) = $0 { return .some(id) } else { return nil } }
+    public var mentions: [String?] {
+        compactMap { if case .mention(let id) = $0 { return .some(id) } else { return nil } }
     }
 }

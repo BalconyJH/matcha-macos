@@ -1,28 +1,28 @@
 import Foundation
 import SwiftData
 
-public extension MatchaStore {
+extension MatchaStore {
     // MARK: - Messages
 
     /// Persists a message, assigning the next sequence number in its chat.
     /// Allocation and insertion run on the same model actor and transaction.
-    func append(_ message: Message) async throws -> Message {
+    public func append(_ message: Message) async throws -> Message {
         try await executor.append(message)
     }
 
-    func save(_ message: Message) async throws {
+    public func save(_ message: Message) async throws {
         try await executor.save(message)
     }
 
-    func message(id: String) async throws -> Message? {
+    public func message(id: String) async throws -> Message? {
         try await executor.message(id: id)
     }
 
-    func message(scene: ChatScene, peerID: String, seq: Int64, selfID: String) async throws -> Message? {
+    public func message(scene: ChatScene, peerID: String, seq: Int64, selfID: String) async throws -> Message? {
         try await executor.message(scene: scene, peerID: peerID, seq: seq, selfID: selfID)
     }
 
-    func messages(in chat: Chat, limit: Int = 200) async throws -> [Message] {
+    public func messages(in chat: Chat, limit: Int = 200) async throws -> [Message] {
         try await executor.messages(in: chat, limit: limit)
     }
 
@@ -31,11 +31,11 @@ public extension MatchaStore {
     /// Forward bundles are stored inline with message content, so this queries that
     /// source of truth instead of maintaining a second ID-to-nodes cache that could
     /// outlive a deleted message or become stale after an edit.
-    func forwardNodes(id: String, selfID: String) async throws -> [MessageSegment.ForwardNode]? {
+    public func forwardNodes(id: String, selfID: String) async throws -> [MessageSegment.ForwardNode]? {
         try await executor.forwardNodes(id: id, selfID: selfID)
     }
 
-    func history(
+    public func history(
         scene: ChatScene,
         peerID: String,
         selfID: String,
@@ -51,37 +51,37 @@ public extension MatchaStore {
         )
     }
 
-    func recallMessage(id: String, by operatorID: String) async throws -> Message? {
+    public func recallMessage(id: String, by operatorID: String) async throws -> Message? {
         try await executor.recallMessage(id: id, by: operatorID)
     }
 
-    func activeChats(selfID: String) async throws -> [(chat: Chat, lastMessage: Message)] {
+    public func activeChats(selfID: String) async throws -> [(chat: Chat, lastMessage: Message)] {
         try await executor.activeChats(selfID: selfID)
     }
 
-    func deleteMessages(in chat: Chat) async throws {
+    public func deleteMessages(in chat: Chat) async throws {
         try await executor.deleteMessages(in: chat)
     }
 
     // MARK: - Requests
 
-    func save(_ request: PendingRequest) async throws {
+    public func save(_ request: PendingRequest) async throws {
         try await executor.save(request)
     }
 
-    func request(id: String) async throws -> PendingRequest? {
+    public func request(id: String) async throws -> PendingRequest? {
         try await executor.request(id: id)
     }
 
-    func request(flag: String) async throws -> PendingRequest? {
+    public func request(flag: String) async throws -> PendingRequest? {
         try await executor.request(flag: flag)
     }
 
-    func pendingRequests(selfID: String, kind: PendingRequest.Kind? = nil) async throws -> [PendingRequest] {
+    public func pendingRequests(selfID: String, kind: PendingRequest.Kind? = nil) async throws -> [PendingRequest] {
         try await executor.pendingRequests(selfID: selfID, kind: kind)
     }
 
-    func resolve(
+    public func resolve(
         requestID: String,
         as resolution: PendingRequest.Resolution
     ) async throws -> PendingRequest? {
@@ -90,11 +90,11 @@ public extension MatchaStore {
 
     // MARK: - Assets
 
-    func save(_ asset: Asset) async throws {
+    public func save(_ asset: Asset) async throws {
         try await executor.save(asset)
     }
 
-    func asset(id: String) async throws -> Asset? {
+    public func asset(id: String) async throws -> Asset? {
         try await executor.asset(id: id)
     }
 }
@@ -202,7 +202,7 @@ extension StoreExecutor {
         in content: [MessageSegment]
     ) -> [MessageSegment.ForwardNode]? {
         for segment in content {
-            guard case let .forward(forwardID, nodes) = segment else { continue }
+            guard case .forward(let forwardID, let nodes) = segment else { continue }
             if forwardID == id { return nodes }
             for node in nodes {
                 if let nested = forwardNodes(id: id, in: node.content) {
@@ -264,7 +264,8 @@ extension StoreExecutor {
                 latestByChat[message.chat] = message
             }
         }
-        return latestByChat
+        return
+            latestByChat
             .map { (chat: $0.key, lastMessage: $0.value) }
             .sorted {
                 if $0.lastMessage.time != $1.lastMessage.time {

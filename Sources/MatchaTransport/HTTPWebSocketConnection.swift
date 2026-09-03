@@ -50,25 +50,26 @@ public final class HTTPWebSocketConnection: @unchecked Sendable {
     /// The RFC 6455 response for a valid opening request.
     static func openingHandshakeResponse(for request: HTTPRequest) -> Data? {
         guard request.method == "GET",
-              request.headers["Upgrade"]?.lowercased() == "websocket",
-              request.headers["Connection"]?
-              .split(separator: ",")
-              .contains(where: { $0.trimmingCharacters(in: .whitespaces).lowercased() == "upgrade" }) == true,
-              request.headers["Sec-WebSocket-Version"] == "13",
-              let key = request.headers["Sec-WebSocket-Key"],
-              Data(base64Encoded: key)?.count == 16
+            request.headers["Upgrade"]?.lowercased() == "websocket",
+            request.headers["Connection"]?
+                .split(separator: ",")
+                .contains(where: { $0.trimmingCharacters(in: .whitespaces).lowercased() == "upgrade" }) == true,
+            request.headers["Sec-WebSocket-Version"] == "13",
+            let key = request.headers["Sec-WebSocket-Key"],
+            Data(base64Encoded: key)?.count == 16
         else {
             return nil
         }
 
         let digest = Insecure.SHA1.hash(data: Data((key + webSocketGUID).utf8))
         let accept = Data(digest).base64EncodedString()
-        let response = [
-            "HTTP/1.1 101 Switching Protocols",
-            "Upgrade: websocket",
-            "Connection: Upgrade",
-            "Sec-WebSocket-Accept: \(accept)",
-        ].joined(separator: "\r\n") + "\r\n\r\n"
+        let response =
+            [
+                "HTTP/1.1 101 Switching Protocols",
+                "Upgrade: websocket",
+                "Connection: Upgrade",
+                "Sec-WebSocket-Accept: \(accept)",
+            ].joined(separator: "\r\n") + "\r\n\r\n"
         return Data(response.utf8)
     }
 
@@ -89,13 +90,15 @@ public final class HTTPWebSocketConnection: @unchecked Sendable {
         }
         let serialized = Self.serialize(opcode: opcode, payload: frame.data)
         let completion = SendCompletion()
-        connection.send(content: serialized, completion: .contentProcessed { error in
-            if let error {
-                completion.resolve(.failure(.connectFailed(error.localizedDescription)))
-            } else {
-                completion.resolve(.success(()))
-            }
-        })
+        connection.send(
+            content: serialized,
+            completion: .contentProcessed { error in
+                if let error {
+                    completion.resolve(.failure(.connectFailed(error.localizedDescription)))
+                } else {
+                    completion.resolve(.success(()))
+                }
+            })
         try await withTaskCancellationHandler {
             try await completion.value()
         } onCancel: {
@@ -116,7 +119,7 @@ public final class HTTPWebSocketConnection: @unchecked Sendable {
 
     public var peerDescription: String {
         switch connection.endpoint {
-        case let .hostPort(host, port):
+        case .hostPort(let host, let port):
             return "\(host):\(port)"
         default:
             return String(describing: connection.endpoint)
@@ -130,7 +133,8 @@ public final class HTTPWebSocketConnection: @unchecked Sendable {
     }
 
     private func receive() {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, complete, error in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) {
+            [weak self] data, _, complete, error in
             guard let self else { return }
             if let data, !data.isEmpty {
                 lock.lock()
@@ -250,9 +254,11 @@ public final class HTTPWebSocketConnection: @unchecked Sendable {
     private func close(with frame: Data) {
         guard beginClosing() else { return }
         let connection = connection
-        connection.send(content: frame, completion: .contentProcessed { _ in
-            connection.cancel()
-        })
+        connection.send(
+            content: frame,
+            completion: .contentProcessed { _ in
+                connection.cancel()
+            })
         DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
             connection.cancel()
         }
@@ -298,7 +304,8 @@ public final class HTTPWebSocketConnection: @unchecked Sendable {
         var payloadLength = UInt64(lengthMarker)
         if lengthMarker == 126 {
             guard data.count >= cursor + 2 else { return nil }
-            payloadLength = UInt64(byte(in: data, at: cursor)) << 8
+            payloadLength =
+                UInt64(byte(in: data, at: cursor)) << 8
                 | UInt64(byte(in: data, at: cursor + 1))
             guard payloadLength >= 126 else { throw FrameError.nonMinimalLength }
             cursor += 2
@@ -308,7 +315,7 @@ public final class HTTPWebSocketConnection: @unchecked Sendable {
                 throw FrameError.payloadTooLarge
             }
             payloadLength = 0
-            for offset in 0 ..< 8 {
+            for offset in 0..<8 {
                 payloadLength = payloadLength << 8 | UInt64(byte(in: data, at: cursor + offset))
             }
             guard payloadLength > UInt64(UInt16.max) else {
@@ -320,15 +327,19 @@ public final class HTTPWebSocketConnection: @unchecked Sendable {
             throw FrameError.payloadTooLarge
         }
         guard data.count >= cursor + 4 else { return nil }
-        let maskingKey = (0 ..< 4).map { byte(in: data, at: cursor + $0) }
+        let maskingKey = (0..<4).map { byte(in: data, at: cursor + $0) }
         cursor += 4
 
         guard payloadLength <= UInt64(Int.max),
-              data.count >= cursor + Int(payloadLength)
+            data.count >= cursor + Int(payloadLength)
         else {
             return nil
         }
-        var payload = Array(data[data.index(data.startIndex, offsetBy: cursor) ..< data.index(data.startIndex, offsetBy: cursor + Int(payloadLength))])
+        var payload = Array(
+            data[
+                data.index(
+                    data.startIndex, offsetBy: cursor)..<data.index(
+                        data.startIndex, offsetBy: cursor + Int(payloadLength))])
         for index in payload.indices {
             payload[index] ^= maskingKey[index % 4]
         }
@@ -344,11 +355,13 @@ public final class HTTPWebSocketConnection: @unchecked Sendable {
         guard payload.count != 1 else { throw FrameError.invalidClosePayload }
         guard payload.count >= 2 else { return }
 
-        let code = UInt16(byte(in: payload, at: 0)) << 8
+        let code =
+            UInt16(byte(in: payload, at: 0)) << 8
             | UInt16(byte(in: payload, at: 1))
-        let isDefinedProtocolCode = (1000 ... 1014).contains(code)
+        let isDefinedProtocolCode =
+            (1000...1014).contains(code)
             && ![1004, 1005, 1006].contains(code)
-        guard isDefinedProtocolCode || (3000 ... 4999).contains(code) else {
+        guard isDefinedProtocolCode || (3000...4999).contains(code) else {
             throw FrameError.invalidClosePayload
         }
 

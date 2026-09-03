@@ -76,16 +76,16 @@ public protocol ProtocolImplementation: AnyObject, Sendable {
     func heartbeatFrame() async -> OutboundFrame?
 }
 
-public extension ProtocolImplementation {
+extension ProtocolImplementation {
     /// Whether this implementation can be paired with a transport at the session boundary.
-    func supports(_ transport: TransportMode) -> Bool {
+    public func supports(_ transport: TransportMode) -> Bool {
         Self.supportedTransports.contains(transport)
     }
 
-    var webSocketClientHandshake: WebSocketClientHandshake { WebSocketClientHandshake() }
-    func handshakeFrames() async -> [OutboundFrame] { [] }
-    var heartbeatInterval: TimeInterval? { nil }
-    func heartbeatFrame() async -> OutboundFrame? { nil }
+    public var webSocketClientHandshake: WebSocketClientHandshake { WebSocketClientHandshake() }
+    public func handshakeFrames() async -> [OutboundFrame] { [] }
+    public var heartbeatInterval: TimeInterval? { nil }
+    public func heartbeatFrame() async -> OutboundFrame? { nil }
 }
 
 /// Compatibility alias for the earlier, consumer-side terminology.

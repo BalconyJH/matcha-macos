@@ -172,12 +172,14 @@ extension MilkyProtocolImplementation {
         guard let seq = call.int64("message_seq") else {
             return invalidParameter("Missing message_seq")
         }
-        guard let message = try await platform.store.message(
-            scene: scene,
-            peerID: peerID,
-            seq: seq,
-            selfID: selfID
-        ) else {
+        guard
+            let message = try await platform.store.message(
+                scene: scene,
+                peerID: peerID,
+                seq: seq,
+                selfID: selfID
+            )
+        else {
             throw PlatformError.messageNotFound("\(scene.rawValue):\(peerID):\(seq)")
         }
 
@@ -195,12 +197,14 @@ extension MilkyProtocolImplementation {
         guard let seq = call.int64("message_seq") else {
             return invalidParameter("Missing message_seq")
         }
-        guard let message = try await platform.store.message(
-            scene: scene,
-            peerID: peerID,
-            seq: seq,
-            selfID: selfID
-        ) else {
+        guard
+            let message = try await platform.store.message(
+                scene: scene,
+                peerID: peerID,
+                seq: seq,
+                selfID: selfID
+            )
+        else {
             throw PlatformError.messageNotFound("\(scene.rawValue):\(peerID):\(seq)")
         }
 
@@ -260,8 +264,8 @@ extension MilkyProtocolImplementation {
         // the rest of the app uses for local references is returned instead.
         let url: String
         switch asset.source {
-        case let .remote(remote): url = remote
-        case let .local(path): url = URL(fileURLWithPath: path).absoluteString
+        case .remote(let remote): url = remote
+        case .local(let path): url = URL(fileURLWithPath: path).absoluteString
         case .inline: url = "matcha-asset://\(asset.id)"
         }
         return .success(["url": .string(url)])
@@ -297,9 +301,9 @@ extension MilkyProtocolImplementation {
 
     private static func forwardAvatarURL(_ value: String?) -> String {
         guard let value,
-              let url = URL(string: value),
-              let scheme = url.scheme?.lowercased(),
-              scheme == "http" || scheme == "https"
+            let url = URL(string: value),
+            let scheme = url.scheme?.lowercased(),
+            scheme == "http" || scheme == "https"
         else { return "" }
         return url.absoluteString
     }
@@ -479,12 +483,14 @@ extension MilkyProtocolImplementation {
         guard let reaction = call.string("reaction") else {
             return invalidParameter("Missing reaction")
         }
-        guard let message = try await platform.store.message(
-            scene: .group,
-            peerID: groupID,
-            seq: seq,
-            selfID: selfID
-        ) else {
+        guard
+            let message = try await platform.store.message(
+                scene: .group,
+                peerID: groupID,
+                seq: seq,
+                selfID: selfID
+            )
+        else {
             throw PlatformError.messageNotFound("group:\(groupID):\(seq)")
         }
 
@@ -504,7 +510,8 @@ extension MilkyProtocolImplementation {
         let limit = max(call.int("limit") ?? 20, 1)
         // Invitations addressed to the bot have their own `group_invitation` event
         // and invitation APIs. They are not `GroupNotification` values.
-        let requests = call.bool("is_filtered") == true
+        let requests =
+            call.bool("is_filtered") == true
             ? []
             : try await platform.store.pendingRequests(
                 selfID: selfID,
@@ -512,7 +519,8 @@ extension MilkyProtocolImplementation {
             )
         // Descending by sequence, which the spec asks for and which is unrelated to
         // arrival order because the sequence is derived from the flag.
-        var numbered = requests
+        var numbered =
+            requests
             .map { (request: $0, seq: MilkyEventEncoder.notificationSeq(for: $0)) }
             .sorted { $0.seq > $1.seq }
         if let start = call.int64("start_notification_seq") {
@@ -521,7 +529,7 @@ extension MilkyProtocolImplementation {
 
         let page = numbered.prefix(limit)
         var data: [String: JSONValue] = [
-            "notifications": .array(page.map { entityEncoder.groupNotification($0.request, seq: $0.seq) }),
+            "notifications": .array(page.map { entityEncoder.groupNotification($0.request, seq: $0.seq) })
         ]
         // Optional by protocol: absence means this is the final page.
         if numbered.count > page.count, let last = page.last {
@@ -544,11 +552,13 @@ extension MilkyProtocolImplementation {
         guard call.bool("is_filtered") != true else {
             throw PlatformError.requestNotFound(String(seq))
         }
-        guard let request = try await groupRequest(
-            seq: seq,
-            kind: .groupJoin,
-            groupID: groupID
-        ) else {
+        guard
+            let request = try await groupRequest(
+                seq: seq,
+                kind: .groupJoin,
+                groupID: groupID
+            )
+        else {
             throw PlatformError.requestNotFound(String(seq))
         }
         try await platform.resolveRequest(
@@ -568,11 +578,13 @@ extension MilkyProtocolImplementation {
         guard let groupID = call.id("group_id") else {
             return invalidParameter("Missing group_id")
         }
-        guard let request = try await groupRequest(
-            seq: seq,
-            kind: .groupInvite,
-            groupID: groupID
-        ) else {
+        guard
+            let request = try await groupRequest(
+                seq: seq,
+                kind: .groupInvite,
+                groupID: groupID
+            )
+        else {
             throw PlatformError.requestNotFound(String(seq))
         }
         try await platform.resolveRequest(flag: request.flag, approve: approve)

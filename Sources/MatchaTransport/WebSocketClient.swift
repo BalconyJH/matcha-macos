@@ -78,7 +78,8 @@ public final class WebSocketClient: @unchecked Sendable {
 
     private func connect(generation: UInt64) {
         lock.lock()
-        let shouldConnect = !explicitlyClosed
+        let shouldConnect =
+            !explicitlyClosed
             && generation == self.generation
             && updateContinuation != nil
         lock.unlock()
@@ -90,7 +91,7 @@ public final class WebSocketClient: @unchecked Sendable {
         }
         let scheme = configuration.url.scheme?.lowercased()
         guard scheme == "ws" || scheme == "wss",
-              configuration.url.port.map({ (1 ... Int(UInt16.max)).contains($0) }) ?? true
+            configuration.url.port.map({ (1...Int(UInt16.max)).contains($0) }) ?? true
         else {
             emit(.failed(.invalidURL(configuration.url.absoluteString)))
             return
@@ -131,8 +132,8 @@ public final class WebSocketClient: @unchecked Sendable {
         let connectionID = connection.id
         lock.lock()
         guard !explicitlyClosed,
-              generation == self.generation,
-              updateContinuation != nil
+            generation == self.generation,
+            updateContinuation != nil
         else {
             lock.unlock()
             connection.close()
@@ -157,7 +158,8 @@ public final class WebSocketClient: @unchecked Sendable {
         generation: UInt64
     ) {
         lock.lock()
-        let isCurrent = !explicitlyClosed
+        let isCurrent =
+            !explicitlyClosed
             && generation == self.generation
             && current?.id == connection.id
         lock.unlock()
@@ -189,10 +191,10 @@ public final class WebSocketClient: @unchecked Sendable {
         reconnectWorkItem?.cancel()
         reconnectWorkItem = nil
         guard !explicitlyClosed,
-              generation == self.generation,
-              updateContinuation != nil,
-              let interval,
-              interval > 0
+            generation == self.generation,
+            updateContinuation != nil,
+            let interval,
+            interval > 0
         else {
             lock.unlock()
             return

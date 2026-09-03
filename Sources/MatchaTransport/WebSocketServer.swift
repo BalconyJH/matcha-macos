@@ -109,7 +109,7 @@ public final class WebSocketServer: @unchecked Sendable {
             case .ready:
                 startup.resolve(.success(()))
                 self?.startupDidFinish(startup)
-            case let .failed(error):
+            case .failed(let error):
                 let failure = TransportError.listenFailed(
                     port: self?.port ?? 0,
                     underlying: error.localizedDescription

@@ -68,7 +68,7 @@ public final class OneBotProtocolImplementation: ProtocolImplementation, @unchec
             return WebSocketClientHandshake(
                 defaultPath: version.noneBotReverseWebSocketPath,
                 headers: [
-                    ("User-Agent", userAgent),
+                    ("User-Agent", userAgent)
                 ],
                 subprotocols: ["12.\(Self.implementationName)"]
             )
@@ -81,7 +81,8 @@ public final class OneBotProtocolImplementation: ProtocolImplementation, @unchec
         // v11 lets a framework append `_async` to any action to say it does not want
         // to wait. Matcha answers everything promptly, so the suffix is stripped and
         // the action handled normally.
-        let name = version == .v11 && call.name.hasSuffix("_async")
+        let name =
+            version == .v11 && call.name.hasSuffix("_async")
             ? String(call.name.dropLast("_async".count))
             : call.name
 
@@ -104,53 +105,54 @@ public final class OneBotProtocolImplementation: ProtocolImplementation, @unchec
     ///
     /// Static so `get_supported_actions` can report exactly what is dispatchable —
     /// the table is its own manifest and cannot drift from what is implemented.
-    static let actions: [String: @Sendable (OneBotProtocolImplementation, ProtocolCall) async throws -> ProtocolReply] = [
-        // Sending
-        "send_msg": { try await $0.sendMessage($1) },
-        "send_private_msg": { try await $0.sendMessage($1, forcedScene: .friend) },
-        "send_group_msg": { try await $0.sendMessage($1, forcedScene: .group) },
-        "send_message": { try await $0.sendMessage($1) },
+    static let actions: [String: @Sendable (OneBotProtocolImplementation, ProtocolCall) async throws -> ProtocolReply] =
+        [
+            // Sending
+            "send_msg": { try await $0.sendMessage($1) },
+            "send_private_msg": { try await $0.sendMessage($1, forcedScene: .friend) },
+            "send_group_msg": { try await $0.sendMessage($1, forcedScene: .group) },
+            "send_message": { try await $0.sendMessage($1) },
 
-        // Recalling
-        "delete_msg": { try await $0.deleteMessage($1) },
-        "delete_message": { try await $0.deleteMessage($1) },
-        "get_msg": { try await $0.getMessage($1) },
-        "get_message": { try await $0.getMessage($1) },
+            // Recalling
+            "delete_msg": { try await $0.deleteMessage($1) },
+            "delete_message": { try await $0.deleteMessage($1) },
+            "get_msg": { try await $0.getMessage($1) },
+            "get_message": { try await $0.getMessage($1) },
 
-        // Identity
-        "get_login_info": { implementation, _ in await implementation.loginInfo() },
-        "get_self_info": { implementation, _ in await implementation.loginInfo() },
-        "get_stranger_info": { try await $0.userInfo($1) },
-        "get_user_info": { try await $0.userInfo($1) },
-        "get_friend_list": { implementation, _ in await implementation.friendList() },
+            // Identity
+            "get_login_info": { implementation, _ in await implementation.loginInfo() },
+            "get_self_info": { implementation, _ in await implementation.loginInfo() },
+            "get_stranger_info": { try await $0.userInfo($1) },
+            "get_user_info": { try await $0.userInfo($1) },
+            "get_friend_list": { implementation, _ in await implementation.friendList() },
 
-        // Groups
-        "get_group_info": { try await $0.groupInfo($1) },
-        "get_group_list": { implementation, _ in await implementation.groupList() },
-        "get_group_member_info": { try await $0.memberInfo($1) },
-        "get_group_member_list": { try await $0.memberList($1) },
-        "set_group_name": { try await $0.setGroupName($1) },
-        "set_group_card": { try await $0.setGroupCard($1) },
-        "set_group_special_title": { try await $0.setGroupTitle($1) },
-        "set_group_admin": { try await $0.setGroupAdmin($1) },
-        "set_group_ban": { try await $0.setGroupBan($1) },
-        "set_group_whole_ban": { try await $0.setGroupWholeBan($1) },
-        "set_group_kick": { try await $0.kickMember($1) },
-        "set_group_leave": { try await $0.leaveGroup($1) },
-        "leave_group": { try await $0.leaveGroup($1) },
+            // Groups
+            "get_group_info": { try await $0.groupInfo($1) },
+            "get_group_list": { implementation, _ in await implementation.groupList() },
+            "get_group_member_info": { try await $0.memberInfo($1) },
+            "get_group_member_list": { try await $0.memberList($1) },
+            "set_group_name": { try await $0.setGroupName($1) },
+            "set_group_card": { try await $0.setGroupCard($1) },
+            "set_group_special_title": { try await $0.setGroupTitle($1) },
+            "set_group_admin": { try await $0.setGroupAdmin($1) },
+            "set_group_ban": { try await $0.setGroupBan($1) },
+            "set_group_whole_ban": { try await $0.setGroupWholeBan($1) },
+            "set_group_kick": { try await $0.kickMember($1) },
+            "set_group_leave": { try await $0.leaveGroup($1) },
+            "leave_group": { try await $0.leaveGroup($1) },
 
-        // Requests
-        "set_friend_add_request": { try await $0.resolveRequest($1) },
-        "set_group_add_request": { try await $0.resolveRequest($1) },
+            // Requests
+            "set_friend_add_request": { try await $0.resolveRequest($1) },
+            "set_group_add_request": { try await $0.resolveRequest($1) },
 
-        // Capability and status
-        "get_status": { implementation, _ in implementation.status() },
-        "get_version_info": { implementation, _ in implementation.versionInfo() },
-        "get_version": { implementation, _ in implementation.versionInfo() },
-        "get_supported_actions": { implementation, _ in implementation.supportedActions() },
-        "can_send_image": { _, _ in .success(["yes": true]) },
-        "can_send_record": { _, _ in .success(["yes": true]) },
-    ]
+            // Capability and status
+            "get_status": { implementation, _ in implementation.status() },
+            "get_version_info": { implementation, _ in implementation.versionInfo() },
+            "get_version": { implementation, _ in implementation.versionInfo() },
+            "get_supported_actions": { implementation, _ in implementation.supportedActions() },
+            "can_send_image": { _, _ in .success(["yes": true]) },
+            "can_send_record": { _, _ in .success(["yes": true]) },
+        ]
 
     // MARK: - Outbound events
 
@@ -172,7 +174,7 @@ public final class OneBotProtocolImplementation: ProtocolImplementation, @unchec
                     "post_type": "meta_event",
                     "meta_event_type": "lifecycle",
                     "sub_type": "connect",
-                ]),
+                ])
             ]
         case .v12:
             // v12 pairs the connect meta-event with an initial status snapshot.
@@ -284,7 +286,7 @@ public final class OneBotProtocolImplementation: ProtocolImplementation, @unchec
                     [
                         "self": ["platform": "matcha", "user_id": .string(selfID)],
                         "online": true,
-                    ],
+                    ]
                 ],
             ]
         }

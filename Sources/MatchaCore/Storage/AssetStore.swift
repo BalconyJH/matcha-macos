@@ -95,7 +95,7 @@ public actor AssetStore {
         var lastDownloadError: (any Error)?
         for candidate in [reference, fallbackURL].compacted() {
             guard let url = URL(string: candidate), let scheme = url.scheme?.lowercased(),
-                  scheme == "http" || scheme == "https"
+                scheme == "http" || scheme == "https"
             else { continue }
             do {
                 let (data, response) = try await session.data(from: url)

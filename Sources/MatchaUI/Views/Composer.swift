@@ -29,7 +29,7 @@ struct ComposerDraft: Equatable {
     ) -> [MessageSegment] {
         var content = mentions.compactMap { target -> MessageSegment? in
             if let userID = target.userID,
-               allowedMentionUserIDs.map({ !$0.contains(userID) }) == true
+                allowedMentionUserIDs.map({ !$0.contains(userID) }) == true
             {
                 return nil
             }
@@ -111,10 +111,10 @@ struct Composer: View {
             allowsMultipleSelection: true
         ) { result in
             switch result {
-            case let .success(urls):
+            case .success(let urls):
                 environment.reportAttachmentSelectionCompleted()
                 beginAttaching(urls: urls)
-            case let .failure(error):
+            case .failure(let error):
                 environment.reportAttachmentSelectionFailure(error)
             }
         }
@@ -138,7 +138,7 @@ struct Composer: View {
                 isEditable: !draft.isSending,
                 onSubmit: submit
             )
-                .frame(minHeight: 40, idealHeight: 56, maxHeight: 112)
+            .frame(minHeight: 40, idealHeight: 56, maxHeight: 112)
 
             if draft.text.isEmpty {
                 Text("Message…")
@@ -332,7 +332,7 @@ struct Composer: View {
             }
 
             if let asset = await environment.ingestAttachment(at: url),
-               !draft.attachments.contains(where: { $0.id == asset.id })
+                !draft.attachments.contains(where: { $0.id == asset.id })
             {
                 draft.attachments.append(asset)
             }

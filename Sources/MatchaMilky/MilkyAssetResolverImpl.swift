@@ -150,24 +150,28 @@ public actor MilkyAssetResolverImpl: MilkyAssetResolver {
     /// framework author would have no way to tell the guess from a real match.
     public func messageID(forSeq seq: Int64) async -> String? {
         if let declared,
-           let message = (try? await store.message(
-               scene: declared.scene,
-               peerID: declared.peerID,
-               seq: seq,
-               selfID: declared.selfID
-           )) ?? nil
+            let message =
+                (try? await store.message(
+                    scene: declared.scene,
+                    peerID: declared.peerID,
+                    seq: seq,
+                    selfID: declared.selfID
+                )) ?? nil
         {
             return message.id
         }
 
         var matches: [Message] = []
         for candidate in observed {
-            guard let message = (try? await store.message(
-                scene: candidate.scene,
-                peerID: candidate.peerID,
-                seq: seq,
-                selfID: candidate.selfID
-            )) ?? nil else { continue }
+            guard
+                let message =
+                    (try? await store.message(
+                        scene: candidate.scene,
+                        peerID: candidate.peerID,
+                        seq: seq,
+                        selfID: candidate.selfID
+                    )) ?? nil
+            else { continue }
             matches.append(message)
             // Two conversations answering to the same sequence is precisely the
             // ambiguous case; stop rather than keep collecting.

@@ -11,11 +11,11 @@ public enum HTTPWebhookClientError: Error, LocalizedError, Sendable, Equatable {
         switch self {
         case .invalidEndpoint:
             return "Invalid WebHook endpoint"
-        case let .requestFailed(code):
+        case .requestFailed(let code):
             return "WebHook request failed with network error \(code)"
         case .nonHTTPResponse:
             return "WebHook response was not HTTP"
-        case let .rejected(statusCode):
+        case .rejected(let statusCode):
             return "WebHook endpoint returned HTTP \(statusCode)"
         }
     }
@@ -96,7 +96,7 @@ public struct HTTPWebhookClient: Sendable {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw HTTPWebhookClientError.nonHTTPResponse
         }
-        guard (200 ... 299).contains(httpResponse.statusCode) else {
+        guard (200...299).contains(httpResponse.statusCode) else {
             throw HTTPWebhookClientError.rejected(statusCode: httpResponse.statusCode)
         }
     }
@@ -110,7 +110,7 @@ public struct HTTPWebhookClient: Sendable {
         let scheme = url.scheme?.lowercased()
         return (scheme == "http" || scheme == "https")
             && url.host?.isEmpty == false
-            && (url.port.map { (1 ... Int(UInt16.max)).contains($0) } ?? true)
+            && (url.port.map { (1...Int(UInt16.max)).contains($0) } ?? true)
     }
 }
 

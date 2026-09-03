@@ -28,7 +28,7 @@ public struct RootView: View {
                 environment: environment,
                 selectedSettingsTab: $selectedSettingsTab
             )
-                .navigationSplitViewColumnWidth(min: 230, ideal: 280, max: 420)
+            .navigationSplitViewColumnWidth(min: 230, ideal: 280, max: 420)
         } detail: {
             ChatView(environment: environment)
                 .inspector(isPresented: $showingInspector) {
@@ -193,9 +193,9 @@ private struct ConnectionStatusButton: View {
         switch environment.sessionState {
         case .idle:
             return "Not Connected"
-        case let .listening(port):
+        case .listening(let port):
             return "Listening on :\(port)"
-        case let .ready(port):
+        case .ready(let port):
             return "Serving on :\(port)"
         case .connecting:
             return "Connecting"
@@ -206,7 +206,7 @@ private struct ConnectionStatusButton: View {
                 return "Serving"
             }
             switch environment.roundTripTimeState {
-            case let .measured(duration): return durationLabel(duration)
+            case .measured(let duration): return durationLabel(duration)
             case .timedOut: return "Ping Timed Out"
             case .measuring, .unavailable: return "Measuring"
             case .unsupported: return "RTT —"
@@ -221,8 +221,8 @@ private struct ConnectionStatusButton: View {
             environment.sessionState.displayName,
         ]
 
-        if case let .measured(duration) = environment.roundTripTimeState,
-           supportsRoundTripTime
+        if case .measured(let duration) = environment.roundTripTimeState,
+            supportsRoundTripTime
         {
             components.append("RTT \(durationLabel(duration))")
         } else if !supportsRoundTripTime, environment.sessionState.isActive {
@@ -239,7 +239,8 @@ private struct ConnectionStatusButton: View {
 
     private func durationLabel(_ duration: Duration) -> String {
         let components = duration.components
-        let milliseconds = Double(components.seconds) * 1_000
+        let milliseconds =
+            Double(components.seconds) * 1_000
             + Double(components.attoseconds) / 1_000_000_000_000_000
         guard milliseconds >= 1 else { return "<1 ms" }
         return "\(Int(milliseconds.rounded())) ms"
