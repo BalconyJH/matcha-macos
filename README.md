@@ -6,9 +6,10 @@ messages as any identity, create groups, and send friend requests. The framework
 events and action responses it would receive in production. No real account is required, there is no
 risk-control system to worry about, and you do not need another person to help reproduce an issue.
 
-This project is a native macOS rewrite of
-[BalconyJH/matcha](https://github.com/BalconyJH/matcha). The upstream project uses Vue and Tauri;
-this version uses AppKit and SwiftUI and depends only on system frameworks.
+Matcha for macOS is an independent native macOS rewrite of
+[A-kirami/matcha](https://github.com/A-kirami/matcha), originally created by Akirami. The upstream
+project uses Vue and Tauri; this implementation uses AppKit and SwiftUI and depends only on Apple
+system frameworks.
 
 ## Supported Protocols
 
@@ -91,8 +92,9 @@ does not wait for a consumer to connect before allowing simulated messages.
   protocol payloads.
 - `MatchaUI` provides the SwiftUI and AppKit interface, including a dedicated application log
   console. Raw protocol traffic remains available in a separate inspector.
-- `App/MatchaApplication.swift` 是 Xcode App target 的 composition root，负责应用生命周期、
-  window scene 与 menu bar；其余实现仍由 SwiftPM modules 提供。
+- `App/MatchaApplication.swift` is the composition root for the Xcode application target. It owns
+  the application lifecycle, window scenes, and menu bar; the remaining implementation stays in
+  SwiftPM modules.
 
 The key invariant lives in `PlatformService`: every state change passes through it, whether it was
 triggered by a person pressing Send in the app or by a framework calling `send_group_message`.
@@ -111,50 +113,53 @@ JSON Lines records and a structured summary, without overwriting previous export
 
 ## Build and Run
 
-### 前置条件
+### Prerequisites
 
-- macOS 26 或更高版本。
-- 完整安装 `.xcode-version` 指定的 Xcode（当前为 Xcode 27.0 beta 6）。仅安装 Command Line
-  Tools 不足以提供所需的完整 macOS SDK 与 Swift 编译器插件。
-- 可选安装 `xcodes`，用于按仓库版本文件选择 Xcode。
+- macOS 26 or later.
+- A full installation of the Xcode version specified by `.xcode-version` (currently Xcode 27.0
+  beta 6). Command Line Tools alone do not include the complete macOS SDK and Swift compiler
+  plugins required by this project.
+- Optionally, install `xcodes` to select Xcode from the repository's version file.
 
-### 选择 Xcode 工具链
+### Select the Xcode Toolchain
 
-若已安装 `xcodes`，在仓库根目录运行：
+With `xcodes` installed, run the following commands from the repository root:
 
 ```sh
 xcodes select
 xcodebuild -version
 ```
 
-`xcodes select` 会读取 `.xcode-version`。若不使用 `xcodes`，可以在 Xcode 的
-**Settings > Locations > Command Line Tools** 中选择相同版本，或只为当前 shell 指定完整
-Xcode；路径需与本机安装位置一致：
+`xcodes select` reads `.xcode-version`. Without `xcodes`, select the same version under
+**Xcode > Settings > Locations > Command Line Tools**, or set the full Xcode path for the current
+shell. Adjust the path to match the local installation:
 
 ```sh
 export DEVELOPER_DIR="/Applications/Xcode-27.0.0-Beta.6.app/Contents/Developer"
 xcodebuild -version
 ```
 
-若 `xcodebuild` 报告当前 developer directory 是 `/Library/Developer/CommandLineTools`，说明
-仍在使用独立的 Command Line Tools，需要先完成上述选择。
+If `xcodebuild` reports `/Library/Developer/CommandLineTools` as the active developer directory,
+the standalone Command Line Tools are still selected. Select the full Xcode installation before
+continuing.
 
-### 使用 Xcode 构建与运行
+### Build and Run with Xcode
 
-使用所选版本的 Xcode 打开工程：
+Open the project with the selected Xcode installation:
 
 ```sh
 xed Matcha.xcodeproj
 ```
 
-选择共享 scheme `Matcha App` 与运行目标 `My Mac`，然后使用 **Product > Run**（`⌘R`）。
-Xcode App target 是 `.app` bundle、Info.plist、资源、签名和 Archive 的唯一来源；
-`Package.swift` 只定义应用依赖的 Swift modules 与 package tests，因此 `swift run` 不会生成
-可运行的 Matcha App。
+Select the shared `Matcha App` scheme and the `My Mac` destination, then choose
+**Product > Run** (`⌘R`). The Xcode application target is the sole source of the `.app` bundle,
+Info.plist, resources, signing, and archives. `Package.swift` defines the Swift modules and package
+tests used by the application, so `swift run` does not produce a runnable Matcha app.
 
-### 使用命令行构建与运行
+### Build and Run from the Command Line
 
-命令行构建使用同一个共享 scheme，并将 Derived Data 放入已被 Git 忽略的固定目录：
+The command-line build uses the same shared scheme and places Derived Data in a deterministic,
+Git-ignored directory:
 
 ```sh
 xcodebuild \
@@ -166,34 +171,36 @@ xcodebuild \
   build
 ```
 
-构建成功后运行：
+After a successful build, launch the app with:
 
 ```sh
 open .build/xcode/Build/Products/Debug/Matcha.app
 ```
 
-Debug 构建使用本地 ad-hoc 签名，无需 Apple Developer 账号。Release 构建需将
-`-configuration Debug` 改为 `-configuration Release`；产物位于
-`.build/xcode/Build/Products/Release/Matcha.app`。用于分发时应通过 Xcode 的
-**Product > Archive** 生成 archive，并配置相应的签名与公证流程。
+Debug builds use local ad-hoc signing and do not require an Apple Developer account. For a Release
+build, change `-configuration Debug` to `-configuration Release`; the result is written to
+`.build/xcode/Build/Products/Release/Matcha.app`. Distribution builds should be archived through
+**Product > Archive** in Xcode and configured with the appropriate signing and notarization.
 
-App Sandbox 当前保持关闭：协议端允许传入任意本机绝对文件路径作为消息附件，而 sandbox
-无法在没有用户交互授权的情况下读取这些路径。若将来面向 Mac App Store 分发，需要先重新
-设计该文件传输契约，不能只打开 sandbox 开关。
+App Sandbox is currently disabled because protocol clients may provide arbitrary local absolute
+paths for message attachments. A sandboxed app cannot read those paths without user-mediated
+authorization. Supporting Mac App Store distribution would therefore require redesigning the file
+transfer contract rather than merely enabling the sandbox.
 
 ## Quality Checks
 
-仓库使用所选 Xcode 工具链内置的 `swift format`，规则固定在 `.swift-format`。在仓库根目录
-运行统一检查入口：
+The repository uses `swift format` from the selected Xcode toolchain. Its complete rule set is
+checked into `.swift-format`. Run the unified quality gate from the repository root:
 
 ```sh
 ./script/check.sh
 ```
 
-该脚本依次执行严格格式检查、启用 warnings-as-errors 的 SwiftPM 测试，以及启用
-warnings-as-errors 的完整 macOS App 构建。任一步失败都会立即停止。
+The script runs strict formatting checks, the SwiftPM test suite with warnings treated as errors,
+and a complete macOS application build with warnings treated as errors. It stops at the first
+failure.
 
-需要写回格式时，显式运行：
+To apply formatting changes, run:
 
 ```sh
 swift format format \
@@ -204,8 +211,8 @@ swift format format \
   Package.swift App Sources Tests
 ```
 
-命令刻意只列出源码入口，避免递归扫描 `.build` 中的生成文件。格式化后应再次运行
-`./script/check.sh`。
+The command lists source roots explicitly to avoid generated files under `.build`. Run
+`./script/check.sh` again after formatting.
 
 ## Testing
 
@@ -213,17 +220,24 @@ swift format format \
 swift test
 ```
 
-测试由 SwiftPM 唯一拥有，以保留 package 内部的白盒测试边界。该命令只构建 SwiftPM
-modules 与测试，不生成 `.app` bundle。运行前同样需要让 `xcode-select` 或
-`DEVELOPER_DIR` 指向完整 Xcode。
+The test suite lives in SwiftPM to preserve white-box access to package internals. This command
+builds only SwiftPM modules and tests; it does not produce an `.app` bundle. Ensure that
+`xcode-select` or `DEVELOPER_DIR` points to the full Xcode installation before running it.
 
-与真实 `nonebot-adapter-milky` 进程的联调测试默认禁用。启用时需显式提供
-`MATCHA_LIVE_MILKY_API_PORT`、`MATCHA_LIVE_MILKY_TOKEN` 与
-`MATCHA_LIVE_MILKY_SELF_ID`；WebHook 场景另需 `MATCHA_LIVE_MILKY_WEBHOOK_URL`，
-WebSocket 场景则设置 `MATCHA_LIVE_MILKY_EXPECT_WEBSOCKET=1`。这些运行时值不会写入仓库。
+Live interoperability tests against a real `nonebot-adapter-milky` process are disabled by
+default. Enable them by setting `MATCHA_LIVE_MILKY_API_PORT`, `MATCHA_LIVE_MILKY_TOKEN`, and
+`MATCHA_LIVE_MILKY_SELF_ID`. WebHook scenarios also require `MATCHA_LIVE_MILKY_WEBHOOK_URL`;
+WebSocket scenarios require `MATCHA_LIVE_MILKY_EXPECT_WEBSOCKET=1`. These runtime values are never
+written to the repository.
 
 ## Dependencies
 
 The project has no third-party dependencies. Persistence uses SwiftData; the interface uses SwiftUI
 with narrowly scoped AppKit components; and networking, cryptography, and file type identification
 use Network.framework, CryptoKit, and UniformTypeIdentifiers, respectively.
+
+## License
+
+Matcha for macOS is distributed under the [GNU Affero General Public License v3.0](LICENSE). The
+original [Matcha](https://github.com/A-kirami/matcha) project's code is Copyright © 2023 Akirami and
+is licensed under the GNU AGPL v3.0; its logo is separately licensed under CC BY-NC-ND.
