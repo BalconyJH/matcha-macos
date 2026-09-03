@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 110;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -13,6 +13,7 @@
 
 /* Begin PBXFileReference section */
 		516348AC30482D400009B80D /* Matcha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Matcha.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		516348C030482DCE0009B80D /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -51,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				516348AE30482D400009B80D /* App */,
+				516348C130482DCE0009B80D /* Configuration */,
 				516348AD30482D400009B80D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -61,6 +63,14 @@
 				516348AC30482D400009B80D /* Matcha.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		516348C130482DCE0009B80D /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				516348C030482DCE0009B80D /* Shared.xcconfig */,
+			);
+			path = Configuration;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -115,7 +125,7 @@
 			packageReferences = (
 				516348BA30482DCE0009B80D /* XCLocalSwiftPackageReference "." */,
 			);
-			preferredProjectObjectVersion = 110;
+			preferredProjectObjectVersion = 77;
 			productRefGroup = 516348AD30482D400009B80D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -262,12 +272,12 @@
 		};
 		516348B830482D430009B80D /* Debug configuration for PBXNativeTarget "Matcha" */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 516348C030482DCE0009B80D /* Shared.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -279,7 +289,6 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.matcha.macos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -293,12 +302,12 @@
 		};
 		516348B930482D430009B80D /* Release configuration for PBXNativeTarget "Matcha" */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 516348C030482DCE0009B80D /* Shared.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -310,7 +319,6 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.matcha.macos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

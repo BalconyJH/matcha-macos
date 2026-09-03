@@ -1,0 +1,208 @@
+name: Auto Tag
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers] No run content is checked out; the exact successful push SHA is revalidated against current main before any write.
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact current main SHA to recover; defaults to current main
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: auto-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag release version
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.conclusion == 'success') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # Create the immutable annotated release tag after validating current main.
+    outputs:
+      created: ${{ steps.release.outputs.created }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      source_sha: ${{ steps.release.outputs.source_sha }}
+    steps:
+      - name: Validate source and create release tag
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECOVERY_REF_NAME: ${{ github.ref_name }}
+          RECOVERY_REF_TYPE: ${{ github.ref_type }}
+          REQUESTED_SHA: ${{ github.event.workflow_run.head_sha || inputs.source_sha }}
+        run: |
+          set -euo pipefail
+
+          default_branch=$(gh api "/repos/${GITHUB_REPOSITORY}" --jq '.default_branch')
+          if [[ "$default_branch" != "main" ]]; then
+            echo "::error::Expected main as the default branch, got $default_branch."
+            exit 1
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] &&
+            [[ "$RECOVERY_REF_TYPE" != "branch" || "$RECOVERY_REF_NAME" != "$default_branch" ]]; then
+            echo "::error::Recovery must use the default branch workflow definition."
+            exit 1
+          fi
+
+          main_sha=$(gh api "/repos/${GITHUB_REPOSITORY}/git/ref/heads/${default_branch}" --jq '.object.sha')
+          source_sha=${REQUESTED_SHA:-$main_sha}
+          if [[ ! "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Source SHA must be a full lowercase commit SHA."
+            exit 1
+          fi
+          if [[ "$source_sha" != "$main_sha" ]]; then
+            echo "::error::Source $source_sha is stale; current main is $main_sha."
+            exit 1
+          fi
+
+          configuration=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/contents/Configuration/Shared.xcconfig?ref=${source_sha}" \
+            --jq '.content' | tr -d '\n' | base64 --decode)
+          version=$(awk -F '=' '
+            /^[[:space:]]*MARKETING_VERSION[[:space:]]*=/ {
+              value = $2
+              sub(/\/\/.*/, "", value)
+              gsub(/[[:space:]]/, "", value)
+              print value
+              count++
+            }
+            END { if (count != 1) exit 1 }
+          ' <<< "$configuration")
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::MARKETING_VERSION must use MAJOR.MINOR.PATCH."
+            exit 1
+          fi
+
+          tag="v${version}"
+          matching_refs=$(gh api "/repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${tag}")
+          ref_count=$(jq --arg ref "refs/tags/${tag}" '[.[] | select(.ref == $ref)] | length' <<< "$matching_refs")
+          if [[ "$ref_count" -gt 1 ]]; then
+            echo "::error::GitHub returned multiple exact refs for $tag."
+            exit 1
+          fi
+
+          created=false
+          if [[ "$ref_count" -eq 1 ]]; then
+            ref_type=$(jq -r --arg ref "refs/tags/${tag}" \
+              '.[] | select(.ref == $ref) | .object.type' <<< "$matching_refs")
+            ref_sha=$(jq -r --arg ref "refs/tags/${tag}" \
+              '.[] | select(.ref == $ref) | .object.sha' <<< "$matching_refs")
+            if [[ "$ref_type" == "tag" ]]; then
+              tag_object=$(gh api "/repos/${GITHUB_REPOSITORY}/git/tags/${ref_sha}")
+              ref_type=$(jq -r '.object.type' <<< "$tag_object")
+              ref_sha=$(jq -r '.object.sha' <<< "$tag_object")
+            fi
+            if [[ "$ref_type" != "commit" ]]; then
+              echo "::error::Tag $tag does not resolve directly to a commit."
+              exit 1
+            fi
+
+            comparison=$(gh api "/repos/${GITHUB_REPOSITORY}/compare/${ref_sha}...${main_sha}" --jq '.status')
+            if [[ "$comparison" != "ahead" && "$comparison" != "identical" ]]; then
+              echo "::error::Existing tag $tag is not on main; refusing to move it."
+              exit 1
+            fi
+            echo "$tag already exists at $ref_sha; no release was requested."
+          else
+            tagger_date=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+            tag_object_sha=$(jq -n \
+              --arg tag "$tag" \
+              --arg message "Release $tag" \
+              --arg object "$source_sha" \
+              --arg date "$tagger_date" \
+              '{
+                tag: $tag,
+                message: $message,
+                object: $object,
+                type: "commit",
+                tagger: {
+                  name: "github-actions[bot]",
+                  email: "41898282+github-actions[bot]@users.noreply.github.com",
+                  date: $date
+                }
+              }' | gh api --method POST \
+                "/repos/${GITHUB_REPOSITORY}/git/tags" \
+                --input - \
+                --jq '.sha')
+            jq -n \
+              --arg ref "refs/tags/${tag}" \
+              --arg sha "$tag_object_sha" \
+              '{ref: $ref, sha: $sha}' | gh api --method POST \
+                "/repos/${GITHUB_REPOSITORY}/git/refs" \
+                --input - \
+                --silent
+            created=true
+            echo "Created $tag at $source_sha."
+          fi
+
+          {
+            echo "created=$created"
+            echo "release_tag=$tag"
+            echo "source_sha=$source_sha"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release tag"
+            echo
+            if [[ "$created" == "true" ]]; then
+              echo "Created \`$tag\` from \`$source_sha\`."
+            else
+              echo "\`$tag\` already belongs to the main history; no tag was moved and no release was started."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dispatch:
+    name: Start release workflow
+    needs: tag
+    if: needs.tag.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write # Dispatch the protected Release workflow only for the newly created tag.
+    steps:
+      - name: Dispatch protected release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.tag.outputs.release_tag }}
+          SOURCE_SHA: ${{ needs.tag.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+            [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Tag job returned malformed release metadata."
+            exit 1
+          fi
+
+          jq -n \
+            --arg ref main \
+            --arg tag "$RELEASE_TAG" \
+            --arg source "$SOURCE_SHA" \
+            '{ref: $ref, inputs: {release_tag: $tag, source_sha: $source}}' \
+            | gh api --method POST \
+              "/repos/${GITHUB_REPOSITORY}/actions/workflows/release.yml/dispatches" \
+              --input - \
+              --silent
+          {
+            echo "### Release workflow"
+            echo
+            echo "Dispatched \`$RELEASE_TAG\` from \`$SOURCE_SHA\`."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,1046 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing vMAJOR.MINOR.PATCH tag to recover
+        required: true
+        type: string
+      source_sha:
+        description: Exact tagged commit selected by Auto Tag; leave empty for manual recovery
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  # Duplicate recovery runs for one version are serialized; separate versions may build in parallel.
+  group: release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release source
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      source_sha: ${{ steps.release.outputs.source_sha }}
+      version: ${{ steps.release.outputs.version }}
+      build_number: ${{ steps.release.outputs.build_number }}
+      already_published: ${{ steps.release.outputs.already_published }}
+    steps:
+      - name: Validate tag, source, and release metadata
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_SOURCE_SHA: ${{ inputs.source_sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          REQUEST_REF_NAME: ${{ github.ref_name }}
+          REQUEST_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+
+          github_api() {
+            gh api -H 'X-GitHub-Api-Version: 2026-03-10' "$@"
+          }
+
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tag must use vMAJOR.MINOR.PATCH."
+            exit 1
+          fi
+
+          default_branch=$(github_api "/repos/${GITHUB_REPOSITORY}" --jq '.default_branch')
+          if [[ "$default_branch" != "main" ]]; then
+            echo "::error::Expected main as the default branch, got $default_branch."
+            exit 1
+          fi
+          if [[ "$REQUEST_REF_TYPE" != "branch" || "$REQUEST_REF_NAME" != "$default_branch" ]]; then
+            echo "::error::Manual recovery must use the default branch workflow definition."
+            exit 1
+          fi
+
+          main_sha=$(github_api "/repos/${GITHUB_REPOSITORY}/git/ref/heads/${default_branch}" --jq '.object.sha')
+          matching_refs=$(github_api "/repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}")
+          ref_count=$(jq --arg ref "refs/tags/${RELEASE_TAG}" '[.[] | select(.ref == $ref)] | length' <<< "$matching_refs")
+          if [[ "$ref_count" -ne 1 ]]; then
+            echo "::error::Expected exactly one tag named $RELEASE_TAG."
+            exit 1
+          fi
+
+          ref_type=$(jq -r --arg ref "refs/tags/${RELEASE_TAG}" \
+            '.[] | select(.ref == $ref) | .object.type' <<< "$matching_refs")
+          source_sha=$(jq -r --arg ref "refs/tags/${RELEASE_TAG}" \
+            '.[] | select(.ref == $ref) | .object.sha' <<< "$matching_refs")
+          if [[ "$ref_type" == "tag" ]]; then
+            tag_object=$(github_api "/repos/${GITHUB_REPOSITORY}/git/tags/${source_sha}")
+            ref_type=$(jq -r '.object.type' <<< "$tag_object")
+            source_sha=$(jq -r '.object.sha' <<< "$tag_object")
+          fi
+          if [[ "$ref_type" != "commit" || ! "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Release tag does not resolve directly to a commit."
+            exit 1
+          fi
+          if [[ -n "$REQUESTED_SOURCE_SHA" ]]; then
+            if [[ ! "$REQUESTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ || "$REQUESTED_SOURCE_SHA" != "$source_sha" ]]; then
+              echo "::error::Release tag does not match the source selected by the caller."
+              exit 1
+            fi
+          fi
+
+          comparison=$(github_api "/repos/${GITHUB_REPOSITORY}/compare/${source_sha}...${main_sha}" --jq '.status')
+          if [[ "$comparison" != "ahead" && "$comparison" != "identical" ]]; then
+            echo "::error::Release tag is not on main."
+            exit 1
+          fi
+
+          configuration=$(github_api \
+            "/repos/${GITHUB_REPOSITORY}/contents/Configuration/Shared.xcconfig?ref=${source_sha}" \
+            --jq '.content' | tr -d '\n' | base64 --decode)
+          version=$(awk -F '=' '
+            /^[[:space:]]*MARKETING_VERSION[[:space:]]*=/ {
+              value = $2
+              sub(/\/\/.*/, "", value)
+              gsub(/[[:space:]]/, "", value)
+              print value
+              count++
+            }
+            END { if (count != 1) exit 1 }
+          ' <<< "$configuration")
+          build_number=$(awk -F '=' '
+            /^[[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=/ {
+              value = $2
+              sub(/\/\/.*/, "", value)
+              gsub(/[[:space:]]/, "", value)
+              print value
+              count++
+            }
+            END { if (count != 1) exit 1 }
+          ' <<< "$configuration")
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+            [[ ! "$build_number" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Release metadata has an invalid version or build number."
+            exit 1
+          fi
+          if [[ "$RELEASE_TAG" != "v${version}" ]]; then
+            echo "::error::Tag $RELEASE_TAG does not match MARKETING_VERSION $version."
+            exit 1
+          fi
+
+          already_published=false
+          releases_path="$RUNNER_TEMP/releases.json"
+          release_path="$RUNNER_TEMP/published-release.json"
+          github_api --paginate \
+            "/repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --slurp > "$releases_path"
+          published_count=$(jq --arg tag "$RELEASE_TAG" \
+            '[.[][] | select(.tag_name == $tag and .draft == false)] | length' \
+            "$releases_path")
+          if [[ "$published_count" -gt 1 ]]; then
+            echo "::error::Repository contains multiple published releases for $RELEASE_TAG."
+            exit 1
+          fi
+          if [[ "$published_count" -eq 1 ]]; then
+            jq --arg tag "$RELEASE_TAG" \
+              '[.[][] | select(.tag_name == $tag and .draft == false)][0]' \
+              "$releases_path" > "$release_path"
+            if [[ "$(jq -r '.immutable' "$release_path")" != "true" ]] ||
+              [[ "$(jq -r '.prerelease' "$release_path")" != "false" ]] ||
+              [[ "$(jq -r '.name' "$release_path")" != "$RELEASE_TAG" ]] ||
+              [[ "$(jq -r '.author.login' "$release_path")" != "github-actions[bot]" ]] ||
+              [[ "$(jq -r --arg marker "<!-- matcha-release-source:$source_sha -->" \
+                '.body | startswith($marker)' "$release_path")" != "true" ]]; then
+              echo "::error::Published release is mutable or is not owned by this release workflow."
+              exit 1
+            fi
+
+            expected_names=(
+              "Matcha-v$version.zip"
+              "Matcha-v$version.dmg"
+              "SHA256SUMS"
+            )
+            if [[ "$(jq '.assets | length' "$release_path")" -ne "${#expected_names[@]}" ]]; then
+              echo "::error::Published release has an unexpected asset set."
+              exit 1
+            fi
+
+            published_path="$RUNNER_TEMP/published-release"
+            mkdir -p "$published_path"
+            for asset_name in "${expected_names[@]}"; do
+              asset_count=$(jq --arg name "$asset_name" \
+                '[.assets[] | select(.name == $name and .state == "uploaded")] | length' \
+                "$release_path")
+              if [[ "$asset_count" -ne 1 ]]; then
+                echo "::error::Published asset $asset_name is missing, duplicated, or incomplete."
+                exit 1
+              fi
+              asset_id=$(jq -r --arg name "$asset_name" \
+                '.assets[] | select(.name == $name) | .id' "$release_path")
+              remote_digest=$(jq -r --arg name "$asset_name" \
+                '.assets[] | select(.name == $name) | .digest // empty' "$release_path")
+              if [[ ! "$remote_digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                echo "::error::Published asset $asset_name has no trustworthy digest."
+                exit 1
+              fi
+              github_api \
+                -H 'Accept: application/octet-stream' \
+                "/repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+                > "$published_path/$asset_name"
+              downloaded_digest="sha256:$(sha256sum "$published_path/$asset_name" | awk '{ print $1 }')"
+              if [[ "$downloaded_digest" != "$remote_digest" ]]; then
+                echo "::error::Published asset $asset_name does not match GitHub's digest."
+                exit 1
+              fi
+            done
+
+            checksum_names=$(awk '{ print $2 }' "$published_path/SHA256SUMS")
+            expected_checksum_names=$(printf '%s\n' \
+              "Matcha-v$version.zip" \
+              "Matcha-v$version.dmg")
+            if [[ "$checksum_names" != "$expected_checksum_names" ]] ||
+              ! awk 'NF != 2 || $1 !~ /^[0-9a-f]{64}$/ { exit 1 } END { exit NR == 2 ? 0 : 1 }' \
+                "$published_path/SHA256SUMS"; then
+              echo "::error::Published checksum manifest has unexpected contents."
+              exit 1
+            fi
+            (cd "$published_path" && sha256sum --check SHA256SUMS)
+            already_published=true
+          fi
+
+          {
+            echo "source_sha=$source_sha"
+            echo "version=$version"
+            echo "build_number=$build_number"
+            echo "already_published=$already_published"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Validated release source"
+            echo
+            echo "\`$RELEASE_TAG\` resolves to \`$source_sha\` with bundle version \`$version ($build_number)\`."
+            if [[ "$already_published" == "true" ]]; then
+              echo
+              echo "The existing immutable release and its assets are valid; package and publish jobs will be skipped."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  package:
+    name: Sign, notarize, and package
+    needs: validate
+    if: ${{ needs.validate.outputs.already_published != 'true' }}
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment: release
+    permissions:
+      contents: read
+    env:
+      BUILD_NUMBER: ${{ needs.validate.outputs.build_number }}
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Verify checkout and repository gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+          checked_out_sha=$(git rev-parse 'HEAD^{commit}')
+          if [[ "$checked_out_sha" != "$SOURCE_SHA" ]]; then
+            echo "::error::Checkout resolved to $checked_out_sha instead of $SOURCE_SHA."
+            exit 1
+          fi
+          make check
+
+      - name: Install release credentials
+        id: credentials
+        shell: bash
+        env:
+          APPLE_DEVELOPER_ID_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_P12_BASE64 }}
+          APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          APPLE_NOTARY_ISSUER_ID: ${{ vars.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_KEY_ID: ${{ vars.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          RELEASE_IMMUTABILITY_CONFIRMED: ${{ vars.RELEASE_IMMUTABILITY_CONFIRMED }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          for required_name in \
+            APPLE_DEVELOPER_ID_CERTIFICATE_P12_BASE64 \
+            APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD \
+            APPLE_NOTARY_ISSUER_ID \
+            APPLE_NOTARY_KEY_ID \
+            APPLE_NOTARY_KEY_P8_BASE64 \
+            APPLE_TEAM_ID \
+            RELEASE_IMMUTABILITY_CONFIRMED; do
+            if [[ -z "${!required_name:-}" ]]; then
+              echo "::error::Release environment value $required_name is not configured."
+              exit 1
+            fi
+          done
+          if [[ "$RELEASE_IMMUTABILITY_CONFIRMED" != "true" ]]; then
+            echo "::error::Confirm repository release immutability with the release environment variable."
+            exit 1
+          fi
+          if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]] ||
+            [[ ! "$APPLE_NOTARY_KEY_ID" =~ ^[A-Z0-9]{10,32}$ ]] ||
+            [[ ! "$APPLE_NOTARY_ISSUER_ID" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
+            echo "::error::Apple team or notarization identifiers are malformed."
+            exit 1
+          fi
+
+          certificate_path="$RUNNER_TEMP/developer-id-application.p12"
+          notary_key_path="$RUNNER_TEMP/AuthKey.p8"
+          keychain_path="$RUNNER_TEMP/matcha-release.keychain-db"
+          keychain_password=$(openssl rand -hex 32)
+          notary_profile="matcha-release"
+
+          printf '%s' "$APPLE_DEVELOPER_ID_CERTIFICATE_P12_BASE64" | /usr/bin/base64 -D > "$certificate_path"
+          printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | /usr/bin/base64 -D > "$notary_key_path"
+          if [[ ! -s "$certificate_path" || ! -s "$notary_key_path" ]]; then
+            echo "::error::A release credential did not decode to a non-empty file."
+            exit 1
+          fi
+
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -P "$APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD" \
+            -t cert \
+            -f pkcs12 \
+            -k "$keychain_path" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+
+          identities=$(security find-identity -v -p codesigning "$keychain_path")
+          matching_identities=$(printf '%s\n' "$identities" \
+            | grep '"Developer ID Application:' \
+            | grep -F "($APPLE_TEAM_ID)" || true)
+          identity_count=$(printf '%s\n' "$matching_identities" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+          if [[ "$identity_count" != "1" ]]; then
+            echo "::error::Expected exactly one valid Developer ID Application identity for team $APPLE_TEAM_ID."
+            exit 1
+          fi
+          signing_identity_sha=$(awk '{ print $2 }' <<< "$matching_identities")
+          if [[ ! "$signing_identity_sha" =~ ^[0-9A-Fa-f]{40}$ ]]; then
+            echo "::error::Could not resolve the Developer ID signing identity."
+            exit 1
+          fi
+
+          xcrun notarytool store-credentials "$notary_profile" \
+            --key "$notary_key_path" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --keychain "$keychain_path"
+
+          rm -f "$certificate_path" "$notary_key_path"
+          {
+            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            echo "KEYCHAIN_PATH=$keychain_path"
+            echo "NOTARY_PROFILE=$notary_profile"
+            echo "SIGNING_IDENTITY_SHA=$signing_identity_sha"
+          } >> "$GITHUB_ENV"
+
+      - name: Archive and export Developer ID application
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_path="$RUNNER_TEMP/Matcha.xcarchive"
+          export_path="$RUNNER_TEMP/export"
+          options_plist="$RUNNER_TEMP/ExportOptions.plist"
+
+          jq -n \
+            --arg certificate "$SIGNING_IDENTITY_SHA" \
+            --arg team "$APPLE_TEAM_ID" \
+            '{
+              method: "developer-id",
+              destination: "export",
+              signingStyle: "manual",
+              signingCertificate: $certificate,
+              teamID: $team,
+              stripSwiftSymbols: true,
+              manageAppVersionAndBuildNumber: false
+            }' | plutil -convert xml1 -o "$options_plist" -
+          plutil -lint "$options_plist"
+
+          make archive \
+            DERIVED_DATA_PATH="$RUNNER_TEMP/DerivedData" \
+            ARCHIVE_PATH="$archive_path" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$SIGNING_IDENTITY_SHA" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
+          make export \
+            ARCHIVE_PATH="$archive_path" \
+            EXPORT_PATH="$export_path" \
+            EXPORT_OPTIONS_PLIST="$options_plist"
+
+          app_count=$(find "$export_path" -maxdepth 2 -type d -name 'Matcha.app' | wc -l | tr -d ' ')
+          app_path=$(find "$export_path" -maxdepth 2 -type d -name 'Matcha.app' -print -quit)
+          dsym_path="$archive_path/dSYMs/Matcha.app.dSYM"
+          if [[ "$app_count" != "1" || ! -d "$app_path" || ! -d "$dsym_path" ]]; then
+            echo "::error::Export did not produce exactly one Matcha.app and its dSYM."
+            find "$export_path" "$archive_path" -maxdepth 3 -print
+            exit 1
+          fi
+
+          actual_version=$(plutil -extract CFBundleShortVersionString raw -o - "$app_path/Contents/Info.plist")
+          actual_build_number=$(plutil -extract CFBundleVersion raw -o - "$app_path/Contents/Info.plist")
+          if [[ "$actual_version" != "$VERSION" || "$actual_build_number" != "$BUILD_NUMBER" ]]; then
+            echo "::error::Exported bundle metadata does not match the validated release."
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+
+          {
+            echo "APP_PATH=$app_path"
+            echo "ARCHIVE_PATH=$archive_path"
+            echo "DSYM_PATH=$dsym_path"
+            echo "EXPORT_OPTIONS_PLIST=$options_plist"
+          } >> "$GITHUB_ENV"
+
+      - name: Notarize and staple application
+        id: app_notary
+        shell: bash
+        run: |
+          set -euo pipefail
+          submission_zip="$RUNNER_TEMP/Matcha-notarization.zip"
+          result_path="$RUNNER_TEMP/app-notary-result.json"
+          log_path="$RUNNER_TEMP/app-notary-log.json"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$submission_zip"
+
+          set +e
+          xcrun notarytool submit "$submission_zip" \
+            --keychain-profile "$NOTARY_PROFILE" \
+            --keychain "$KEYCHAIN_PATH" \
+            --wait \
+            --output-format json | tee "$result_path"
+          submit_status=${PIPESTATUS[0]}
+          set -e
+
+          submission_id=$(jq -r '.id // empty' "$result_path")
+          submission_status=$(jq -r '.status // empty' "$result_path")
+          if [[ "$submission_id" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+            xcrun notarytool log "$submission_id" \
+              --keychain-profile "$NOTARY_PROFILE" \
+              --keychain "$KEYCHAIN_PATH" \
+              "$log_path"
+          fi
+          if [[ "$submit_status" -ne 0 || "$submission_status" != "Accepted" || ! -f "$log_path" ]]; then
+            echo "::error::Application notarization was not accepted."
+            exit 1
+          fi
+          issue_count=$(jq '(.issues // []) | length' "$log_path")
+          if [[ "$issue_count" -ne 0 ]]; then
+            jq '.issues' "$log_path"
+            echo "::error::Application notarization log contains issues."
+            exit 1
+          fi
+
+          xcrun stapler staple "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+
+      - name: Create release ZIP, disk image, and symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          dist_path="$RUNNER_TEMP/dist"
+          ./script/package-release.sh "$APP_PATH" "$DSYM_PATH" "$VERSION" "$dist_path"
+
+          zip_path="$dist_path/Matcha-v$VERSION.zip"
+          dmg_path="$dist_path/Matcha-v$VERSION.dmg"
+          dsym_zip_path="$dist_path/Matcha-v$VERSION.dSYM.zip"
+          codesign \
+            --force \
+            --sign "$SIGNING_IDENTITY_SHA" \
+            --timestamp \
+            --identifier dev.matcha.macos.dmg \
+            "$dmg_path"
+
+          {
+            echo "DIST_PATH=$dist_path"
+            echo "DMG_PATH=$dmg_path"
+            echo "DSYM_ZIP_PATH=$dsym_zip_path"
+            echo "ZIP_PATH=$zip_path"
+          } >> "$GITHUB_ENV"
+
+      - name: Notarize and staple disk image
+        id: dmg_notary
+        shell: bash
+        run: |
+          set -euo pipefail
+          result_path="$RUNNER_TEMP/dmg-notary-result.json"
+          log_path="$RUNNER_TEMP/dmg-notary-log.json"
+
+          set +e
+          xcrun notarytool submit "$DMG_PATH" \
+            --keychain-profile "$NOTARY_PROFILE" \
+            --keychain "$KEYCHAIN_PATH" \
+            --wait \
+            --output-format json | tee "$result_path"
+          submit_status=${PIPESTATUS[0]}
+          set -e
+
+          submission_id=$(jq -r '.id // empty' "$result_path")
+          submission_status=$(jq -r '.status // empty' "$result_path")
+          if [[ "$submission_id" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+            xcrun notarytool log "$submission_id" \
+              --keychain-profile "$NOTARY_PROFILE" \
+              --keychain "$KEYCHAIN_PATH" \
+              "$log_path"
+          fi
+          if [[ "$submit_status" -ne 0 || "$submission_status" != "Accepted" || ! -f "$log_path" ]]; then
+            echo "::error::Disk image notarization was not accepted."
+            exit 1
+          fi
+          issue_count=$(jq '(.issues // []) | length' "$log_path")
+          if [[ "$issue_count" -ne 0 ]]; then
+            jq '.issues' "$log_path"
+            echo "::error::Disk image notarization log contains issues."
+            exit 1
+          fi
+
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+
+      - name: Verify packaged release
+        shell: bash
+        run: |
+          set -euo pipefail
+          extracted_path="$RUNNER_TEMP/extracted-release"
+          mkdir -p "$extracted_path"
+          ditto -x -k "$ZIP_PATH" "$extracted_path"
+          packaged_app="$extracted_path/Matcha.app"
+
+          ./script/verify-release.sh \
+            "$packaged_app" \
+            "$DMG_PATH" \
+            "$DSYM_PATH" \
+            "$VERSION" \
+            "$BUILD_NUMBER" \
+            "$APPLE_TEAM_ID"
+
+          entitlements_path="$RUNNER_TEMP/release-entitlements.plist"
+          codesign -d --entitlements :- "$packaged_app" > "$entitlements_path" 2>/dev/null || true
+          if [[ -s "$entitlements_path" ]]; then
+            get_task_allow=$(plutil -extract com.apple.security.get-task-allow raw -o - "$entitlements_path" 2>/dev/null || true)
+            if [[ "$get_task_allow" == "true" ]]; then
+              echo "::error::Release app contains the development-only get-task-allow entitlement."
+              exit 1
+            fi
+          fi
+
+          (
+            cd "$DIST_PATH"
+            shasum -a 256 \
+              "Matcha-v$VERSION.zip" \
+              "Matcha-v$VERSION.dmg" > SHA256SUMS
+            shasum -a 256 -c SHA256SUMS
+          )
+
+      - name: Remove release credentials
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          security delete-keychain "$RUNNER_TEMP/matcha-release.keychain-db" 2>/dev/null || true
+          rm -f \
+            "$RUNNER_TEMP/developer-id-application.p12" \
+            "$RUNNER_TEMP/AuthKey.p8" \
+            "$RUNNER_TEMP/ExportOptions.plist" \
+            "$RUNNER_TEMP/Matcha-notarization.zip"
+
+      - name: Upload release assets
+        if: ${{ success() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-assets
+          path: |
+            ${{ runner.temp }}/dist/Matcha-v${{ needs.validate.outputs.version }}.zip
+            ${{ runner.temp }}/dist/Matcha-v${{ needs.validate.outputs.version }}.dmg
+            ${{ runner.temp }}/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload debug symbols
+        if: ${{ success() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Matcha-v${{ needs.validate.outputs.version }}-debug-symbols
+          path: ${{ runner.temp }}/dist/Matcha-v${{ needs.validate.outputs.version }}.dSYM.zip
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload notarization diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Matcha-v${{ needs.validate.outputs.version }}-notarization
+          path: |
+            ${{ runner.temp }}/*-notary-result.json
+            ${{ runner.temp }}/*-notary-log.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - validate
+      - package
+    if: >-
+      always() &&
+      needs.validate.result == 'success' &&
+      needs.validate.outputs.already_published != 'true' &&
+      needs.package.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # Create the draft release and upload its verified assets.
+      id-token: write # Mint a short-lived identity for build provenance.
+      attestations: write # Store provenance for the release checksums.
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-assets
+          path: dist
+
+      - name: Verify downloaded assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=(
+            "Matcha-v$VERSION.zip"
+            "Matcha-v$VERSION.dmg"
+            "SHA256SUMS"
+          )
+          file_count=$(find dist -maxdepth 1 -type f | wc -l | tr -d ' ')
+          if [[ "$file_count" != "${#expected[@]}" ]]; then
+            echo "::error::Downloaded release artifact has unexpected contents."
+            find dist -maxdepth 2 -print
+            exit 1
+          fi
+          for name in "${expected[@]}"; do
+            if [[ ! -f "dist/$name" ]]; then
+              echo "::error::Missing release asset $name."
+              exit 1
+            fi
+          done
+          (cd dist && sha256sum --check SHA256SUMS)
+
+      - name: Prepare complete GitHub Release draft
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          expected_assets=(
+            "dist/Matcha-v$VERSION.zip"
+            "dist/Matcha-v$VERSION.dmg"
+            "dist/SHA256SUMS"
+          )
+          release_path="$RUNNER_TEMP/release.json"
+          releases_path="$RUNNER_TEMP/releases.json"
+          notes_path="$RUNNER_TEMP/release-notes.md"
+
+          github_api() {
+            gh api -H 'X-GitHub-Api-Version: 2026-03-10' "$@"
+          }
+
+          resolve_tag_sha() {
+            local matching_refs ref_count ref_sha ref_type tag_object
+            matching_refs=$(github_api "/repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}")
+            ref_count=$(jq --arg ref "refs/tags/${RELEASE_TAG}" \
+              '[.[] | select(.ref == $ref)] | length' <<< "$matching_refs")
+            if [[ "$ref_count" -ne 1 ]]; then
+              echo "::error::Expected exactly one tag named $RELEASE_TAG."
+              exit 1
+            fi
+
+            ref_type=$(jq -r --arg ref "refs/tags/${RELEASE_TAG}" \
+              '.[] | select(.ref == $ref) | .object.type' <<< "$matching_refs")
+            ref_sha=$(jq -r --arg ref "refs/tags/${RELEASE_TAG}" \
+              '.[] | select(.ref == $ref) | .object.sha' <<< "$matching_refs")
+            if [[ "$ref_type" == "tag" ]]; then
+              tag_object=$(github_api "/repos/${GITHUB_REPOSITORY}/git/tags/${ref_sha}")
+              ref_type=$(jq -r '.object.type' <<< "$tag_object")
+              ref_sha=$(jq -r '.object.sha' <<< "$tag_object")
+            fi
+            if [[ "$ref_type" != "commit" || "$ref_sha" != "$SOURCE_SHA" ]]; then
+              echo "::error::Tag $RELEASE_TAG no longer resolves to validated source $SOURCE_SHA."
+              exit 1
+            fi
+          }
+
+          load_release() {
+            local release_count
+            github_api --paginate \
+              "/repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              --slurp > "$releases_path"
+            release_count=$(jq --arg tag "$RELEASE_TAG" \
+              '[.[][] | select(.tag_name == $tag)] | length' "$releases_path")
+            if [[ "$release_count" -gt 1 ]]; then
+              echo "::error::Repository contains multiple releases for $RELEASE_TAG."
+              exit 1
+            fi
+            if [[ "$release_count" -eq 1 ]]; then
+              jq --arg tag "$RELEASE_TAG" \
+                '[.[][] | select(.tag_name == $tag)][0]' \
+                "$releases_path" > "$release_path"
+            else
+              printf 'null\n' > "$release_path"
+            fi
+          }
+
+          validate_asset_set() {
+            local asset_count expected_path name_count
+            asset_count=$(jq '.assets | length' "$release_path")
+            if [[ "$asset_count" -ne "${#expected_assets[@]}" ]]; then
+              echo "::error::Release must contain exactly ${#expected_assets[@]} assets."
+              exit 1
+            fi
+            for expected_path in "${expected_assets[@]}"; do
+              name_count=$(jq --arg name "${expected_path##*/}" \
+                '[.assets[] | select(.name == $name)] | length' "$release_path")
+              if [[ "$name_count" -ne 1 ]]; then
+                echo "::error::Release asset ${expected_path##*/} is missing or duplicated."
+                exit 1
+              fi
+            done
+          }
+
+          verify_local_asset_digests() {
+            local asset_name asset_path local_digest remote_digest
+            for asset_path in "${expected_assets[@]}"; do
+              asset_name=${asset_path##*/}
+              local_digest="sha256:$(sha256sum "$asset_path" | awk '{ print $1 }')"
+              remote_digest=$(jq -r --arg name "$asset_name" \
+                '.assets[] | select(.name == $name) | .digest // empty' "$release_path")
+              if [[ "$remote_digest" != "$local_digest" ]]; then
+                echo "::error::Release asset $asset_name does not match the prepared build."
+                exit 1
+              fi
+            done
+          }
+
+          resolve_tag_sha
+          load_release
+
+          notes_json=$(jq -n \
+            --arg tag "$RELEASE_TAG" \
+            --arg target main \
+            '{tag_name: $tag, target_commitish: $target}' \
+            | github_api --method POST \
+              "/repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+              --input -)
+          {
+            echo "<!-- matcha-release-source:$SOURCE_SHA -->"
+            echo
+            jq -r '.body' <<< "$notes_json"
+          } > "$notes_path"
+
+          if [[ "$(jq -r 'type' "$release_path")" == "null" ]]; then
+            jq -n \
+              --arg tag "$RELEASE_TAG" \
+              --arg target main \
+              --rawfile body "$notes_path" \
+              '{
+                tag_name: $tag,
+                target_commitish: $target,
+                name: $tag,
+                body: $body,
+                draft: true,
+                prerelease: false
+              }' | github_api --method POST \
+                "/repos/${GITHUB_REPOSITORY}/releases" \
+                --input - \
+                --silent
+            load_release
+          fi
+
+          if [[ "$(jq -r '.tag_name' "$release_path")" != "$RELEASE_TAG" ]] ||
+            [[ "$(jq -r '.prerelease' "$release_path")" != "false" ]] ||
+            [[ "$(jq -r '.name' "$release_path")" != "$RELEASE_TAG" ]] ||
+            [[ "$(jq -r '.author.login' "$release_path")" != "github-actions[bot]" ]]; then
+            echo "::error::Existing release metadata is not owned by this release workflow."
+            exit 1
+          fi
+
+          if [[ "$(jq -r '.draft' "$release_path")" == "false" ]]; then
+            if [[ "$(jq -r '.immutable' "$release_path")" != "true" ]] ||
+              [[ "$(jq -r --arg marker "<!-- matcha-release-source:$SOURCE_SHA -->" \
+                '.body | startswith($marker)' "$release_path")" != "true" ]]; then
+              echo "::error::Published release is mutable or is not bound to the validated source."
+              exit 1
+            fi
+            validate_asset_set
+
+            published_path="$RUNNER_TEMP/published-release"
+            mkdir -p "$published_path"
+            for asset_path in "${expected_assets[@]}"; do
+              asset_name=${asset_path##*/}
+              asset_id=$(jq -r --arg name "$asset_name" \
+                '.assets[] | select(.name == $name) | .id' "$release_path")
+              remote_digest=$(jq -r --arg name "$asset_name" \
+                '.assets[] | select(.name == $name) | .digest // empty' "$release_path")
+              if [[ ! "$remote_digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                echo "::error::Published asset $asset_name has no trustworthy digest."
+                exit 1
+              fi
+              github_api \
+                -H 'Accept: application/octet-stream' \
+                "/repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+                > "$published_path/$asset_name"
+              downloaded_digest="sha256:$(sha256sum "$published_path/$asset_name" | awk '{ print $1 }')"
+              if [[ "$downloaded_digest" != "$remote_digest" ]]; then
+                echo "::error::Published asset $asset_name does not match GitHub's digest."
+                exit 1
+              fi
+            done
+            checksum_names=$(awk '{ print $2 }' "$published_path/SHA256SUMS")
+            expected_checksum_names=$(printf '%s\n' \
+              "Matcha-v$VERSION.zip" \
+              "Matcha-v$VERSION.dmg")
+            if [[ "$checksum_names" != "$expected_checksum_names" ]] ||
+              ! awk 'NF != 2 || $1 !~ /^[0-9a-f]{64}$/ { exit 1 } END { exit NR == 2 ? 0 : 1 }' \
+                "$published_path/SHA256SUMS"; then
+              echo "::error::Published checksum manifest has unexpected contents."
+              exit 1
+            fi
+            (cd "$published_path" && sha256sum --check SHA256SUMS)
+            echo "publish_needed=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### GitHub Release"
+              echo
+              echo "Validated existing immutable release \`$RELEASE_TAG\`; no changes were made."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          unexpected_asset_count=$(jq \
+            --arg zip "Matcha-v$VERSION.zip" \
+            --arg dmg "Matcha-v$VERSION.dmg" \
+            '[.assets[].name | select(. != $zip and . != $dmg and . != "SHA256SUMS")] | length' \
+            "$release_path")
+          if [[ "$unexpected_asset_count" -ne 0 ]]; then
+            echo "::error::Draft release contains assets not managed by this workflow."
+            exit 1
+          fi
+
+          release_id=$(jq -r '.id' "$release_path")
+          jq -n \
+            --arg name "$RELEASE_TAG" \
+            --rawfile body "$notes_path" \
+            '{
+              target_commitish: "main",
+              name: $name,
+              body: $body,
+              draft: true,
+              prerelease: false
+            }' \
+            | github_api --method PATCH \
+              "/repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              --input - \
+              --silent
+
+          while IFS= read -r asset_id; do
+            github_api --method DELETE \
+              "/repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+              --silent
+          done < <(jq -r '.assets[].id' "$release_path")
+
+          gh release upload "$RELEASE_TAG" \
+            "${expected_assets[@]}" \
+            --repo "$GITHUB_REPOSITORY"
+          load_release
+          validate_asset_set
+          verify_local_asset_digests
+
+          expected_body=$(jq -Rs . < "$notes_path")
+          actual_body=$(jq -c '.body' "$release_path")
+          if [[ "$(jq -r '.draft' "$release_path")" != "true" ]] ||
+            [[ "$(jq -r '.prerelease' "$release_path")" != "false" ]] ||
+            [[ "$(jq -r '.name' "$release_path")" != "$RELEASE_TAG" ]] ||
+            [[ "$actual_body" != "$expected_body" ]]; then
+            echo "::error::Prepared release draft metadata changed unexpectedly."
+            exit 1
+          fi
+          echo "publish_needed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Attest release assets
+        if: ${{ steps.release.outputs.publish_needed == 'true' && github.event.repository.visibility == 'public' }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
+          create-storage-record: false
+
+      - name: Publish prepared GitHub Release
+        if: ${{ steps.release.outputs.publish_needed == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          github_api() {
+            gh api -H 'X-GitHub-Api-Version: 2026-03-10' "$@"
+          }
+
+          matching_refs=$(github_api "/repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}")
+          ref_count=$(jq --arg ref "refs/tags/${RELEASE_TAG}" \
+            '[.[] | select(.ref == $ref)] | length' <<< "$matching_refs")
+          if [[ "$ref_count" -ne 1 ]]; then
+            echo "::error::Release tag disappeared before publication."
+            exit 1
+          fi
+          ref_type=$(jq -r --arg ref "refs/tags/${RELEASE_TAG}" \
+            '.[] | select(.ref == $ref) | .object.type' <<< "$matching_refs")
+          ref_sha=$(jq -r --arg ref "refs/tags/${RELEASE_TAG}" \
+            '.[] | select(.ref == $ref) | .object.sha' <<< "$matching_refs")
+          if [[ "$ref_type" == "tag" ]]; then
+            tag_object=$(github_api "/repos/${GITHUB_REPOSITORY}/git/tags/${ref_sha}")
+            ref_type=$(jq -r '.object.type' <<< "$tag_object")
+            ref_sha=$(jq -r '.object.sha' <<< "$tag_object")
+          fi
+          if [[ "$ref_type" != "commit" || "$ref_sha" != "$SOURCE_SHA" ]]; then
+            echo "::error::Release tag changed after package validation."
+            exit 1
+          fi
+
+          github_api --paginate \
+            "/repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --slurp > "$RUNNER_TEMP/releases-final.json"
+          release_count=$(jq --arg tag "$RELEASE_TAG" \
+            '[.[][] | select(.tag_name == $tag)] | length' \
+            "$RUNNER_TEMP/releases-final.json")
+          if [[ "$release_count" -ne 1 ]]; then
+            echo "::error::Prepared release draft is missing or duplicated."
+            exit 1
+          fi
+          jq --arg tag "$RELEASE_TAG" \
+            '[.[][] | select(.tag_name == $tag)][0]' \
+            "$RUNNER_TEMP/releases-final.json" > "$RUNNER_TEMP/release-final.json"
+
+          release_path="$RUNNER_TEMP/release-final.json"
+          notes_path="$RUNNER_TEMP/release-notes.md"
+          expected_body=$(jq -Rs . < "$notes_path")
+          actual_body=$(jq -c '.body' "$release_path")
+          if [[ "$(jq -r '.draft' "$release_path")" != "true" ]] ||
+            [[ "$(jq -r '.prerelease' "$release_path")" != "false" ]] ||
+            [[ "$(jq -r '.name' "$release_path")" != "$RELEASE_TAG" ]] ||
+            [[ "$(jq -r '.author.login' "$release_path")" != "github-actions[bot]" ]] ||
+            [[ "$actual_body" != "$expected_body" ]]; then
+            echo "::error::Release draft metadata changed before publication."
+            exit 1
+          fi
+
+          expected_assets=(
+            "dist/Matcha-v$VERSION.zip"
+            "dist/Matcha-v$VERSION.dmg"
+            "dist/SHA256SUMS"
+          )
+          if [[ "$(jq '.assets | length' "$release_path")" -ne "${#expected_assets[@]}" ]]; then
+            echo "::error::Release draft asset set changed before publication."
+            exit 1
+          fi
+          for asset_path in "${expected_assets[@]}"; do
+            asset_name=${asset_path##*/}
+            asset_count=$(jq --arg name "$asset_name" \
+              '[.assets[] | select(.name == $name)] | length' "$release_path")
+            local_digest="sha256:$(sha256sum "$asset_path" | awk '{ print $1 }')"
+            remote_digest=$(jq -r --arg name "$asset_name" \
+              '.assets[] | select(.name == $name) | .digest // empty' "$release_path")
+            if [[ "$asset_count" -ne 1 || "$remote_digest" != "$local_digest" ]]; then
+              echo "::error::Release draft asset $asset_name changed before publication."
+              exit 1
+            fi
+          done
+
+          release_id=$(jq -r '.id' "$release_path")
+          jq -n '{
+            target_commitish: "main",
+            draft: false,
+            prerelease: false,
+            make_latest: "legacy"
+          }' \
+            | github_api --method PATCH \
+              "/repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              --input - \
+              --silent
+
+          release_json=$(github_api "/repos/${GITHUB_REPOSITORY}/releases/${release_id}")
+          if [[ "$(jq -r '.draft' <<< "$release_json")" != "false" ]] ||
+            [[ "$(jq -r '.prerelease' <<< "$release_json")" != "false" ]] ||
+            [[ "$(jq -r '.immutable' <<< "$release_json")" != "true" ]] ||
+            [[ "$(jq -r '.tag_name' <<< "$release_json")" != "$RELEASE_TAG" ]] ||
+            [[ "$(jq -r '.name' <<< "$release_json")" != "$RELEASE_TAG" ]] ||
+            [[ "$(jq -r '.author.login' <<< "$release_json")" != "github-actions[bot]" ]] ||
+            [[ "$(jq -c '.body' <<< "$release_json")" != "$expected_body" ]] ||
+            [[ "$(jq '.assets | length' <<< "$release_json")" -ne "${#expected_assets[@]}" ]]; then
+            echo "::error::Published release is not the exact immutable draft that was verified."
+            exit 1
+          fi
+
+          for asset_path in "${expected_assets[@]}"; do
+            asset_name=${asset_path##*/}
+            asset_count=$(jq --arg name "$asset_name" \
+              '[.assets[] | select(.name == $name and .state == "uploaded")] | length' \
+              <<< "$release_json")
+            local_digest="sha256:$(sha256sum "$asset_path" | awk '{ print $1 }')"
+            remote_digest=$(jq -r --arg name "$asset_name" \
+              '.assets[] | select(.name == $name) | .digest // empty' \
+              <<< "$release_json")
+            if [[ "$asset_count" -ne 1 || "$remote_digest" != "$local_digest" ]]; then
+              echo "::error::Immutable release asset $asset_name differs from the verified draft."
+              exit 1
+            fi
+          done
+
+          matching_refs=$(github_api "/repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}")
+          ref_count=$(jq --arg ref "refs/tags/${RELEASE_TAG}" \
+            '[.[] | select(.ref == $ref)] | length' <<< "$matching_refs")
+          if [[ "$ref_count" -ne 1 ]]; then
+            echo "::error::Immutable release tag is missing or duplicated."
+            exit 1
+          fi
+          ref_type=$(jq -r --arg ref "refs/tags/${RELEASE_TAG}" \
+            '.[] | select(.ref == $ref) | .object.type' <<< "$matching_refs")
+          ref_sha=$(jq -r --arg ref "refs/tags/${RELEASE_TAG}" \
+            '.[] | select(.ref == $ref) | .object.sha' <<< "$matching_refs")
+          if [[ "$ref_type" == "tag" ]]; then
+            tag_object=$(github_api "/repos/${GITHUB_REPOSITORY}/git/tags/${ref_sha}")
+            ref_type=$(jq -r '.object.type' <<< "$tag_object")
+            ref_sha=$(jq -r '.object.sha' <<< "$tag_object")
+          fi
+          if [[ "$ref_type" != "commit" || "$ref_sha" != "$SOURCE_SHA" ]]; then
+            echo "::error::Immutable release tag does not match the verified source."
+            exit 1
+          fi
+          release_url=$(jq -r '.html_url' <<< "$release_json")
+
+          {
+            echo "### GitHub Release"
+            echo
+            echo "Published [$RELEASE_TAG]($release_url) from \`$SOURCE_SHA\`."
+          } >> "$GITHUB_STEP_SUMMARY"

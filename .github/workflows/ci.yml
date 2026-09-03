@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: Show resolved Xcode build settings
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: macos-26
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Show runner context
+        run: |
+          echo "Runner: $RUNNER_NAME ($RUNNER_OS/$RUNNER_ARCH)"
+          echo "Image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+          swift --version
+          xcrun swift-format --version
+
+      - name: Check source and project metadata
+        run: make quality
+
+  test:
+    name: Tests
+    runs-on: macos-26
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      TEST_LOG: test.log
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run SwiftPM tests
+        run: |
+          set -o pipefail
+          make test 2>&1 | tee "$TEST_LOG"
+
+      - name: Upload test log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-log
+          path: ${{ env.TEST_LOG }}
+          if-no-files-found: warn
+          retention-days: 14
+
+  build:
+    name: Release Build
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      BUILD_LOG: release-build.log
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Show build settings
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+        run: make show-settings
+
+      - name: Build Universal 2 release configuration
+        run: |
+          set -o pipefail
+          make build DERIVED_DATA_PATH="$RUNNER_TEMP/DerivedData" 2>&1 | tee "$BUILD_LOG"
+
+      - name: Analyze release configuration
+        run: |
+          set -o pipefail
+          make analyze DERIVED_DATA_PATH="$RUNNER_TEMP/DerivedData" 2>&1 | tee -a "$BUILD_LOG"
+
+      - name: Verify release architectures
+        run: make verify-universal DERIVED_DATA_PATH="$RUNNER_TEMP/DerivedData"
+
+      - name: Upload build log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-build-log
+          path: ${{ env.BUILD_LOG }}
+          if-no-files-found: warn
+          retention-days: 14
+
+  result:
+    name: Required Checks
+    if: always()
+    needs:
+      - quality
+      - test
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every CI layer
+        shell: bash
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          set -euo pipefail
+          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$BUILD_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "::error::At least one required CI layer did not succeed."
+              exit 1
+            fi
+          done
+          echo "All required CI layers succeeded."

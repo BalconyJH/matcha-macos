@@ -1,5 +1,7 @@
 # Matcha for macOS
 
+[![CI](https://github.com/BalconyJH/matcha-macos/actions/workflows/ci.yml/badge.svg)](https://github.com/BalconyJH/matcha-macos/actions/workflows/ci.yml)
+
 Matcha is a development tool that simulates a chat platform. It presents itself as QQ: the bot
 framework under test connects to it as if it were a real platform, while you use the app to send
 messages as any identity, create groups, and send friend requests. The framework receives the same
@@ -10,6 +12,14 @@ Matcha for macOS is an independent native macOS rewrite of
 [A-kirami/matcha](https://github.com/A-kirami/matcha), originally created by Akirami. The upstream
 project uses Vue and Tauri; this implementation uses AppKit and SwiftUI and depends only on Apple
 system frameworks.
+
+## Releases
+
+[GitHub Releases](https://github.com/BalconyJH/matcha-macos/releases) provide Universal 2 ZIP and
+DMG downloads for macOS 26 or later. Published application bundles are signed with Developer ID,
+notarized by Apple, stapled for offline Gatekeeper verification, and accompanied by SHA-256
+checksums and GitHub build provenance. See [RELEASING.md](RELEASING.md) for the complete trust and
+recovery model.
 
 ## Supported Protocols
 
@@ -115,11 +125,10 @@ JSON Lines records and a structured summary, without overwriting previous export
 
 ### Prerequisites
 
-- macOS 26 or later.
-- A full installation of the Xcode version specified by `.xcode-version` (currently Xcode 27.0
-  beta 6). Command Line Tools alone do not include the complete macOS SDK and Swift compiler
-  plugins required by this project.
-- Optionally, install `xcodes` to select Xcode from the repository's version file.
+- macOS 26 or later to run Matcha; macOS 26.2 or later for the recommended development toolchain.
+- A full installation of Xcode 26.6 or newer with the macOS 26 SDK. Command Line Tools alone do not
+  include the complete SDK and Swift compiler plugins required by this project.
+- Optionally, install `xcodes` to select the repository's recommended stable Xcode version.
 
 ### Select the Xcode Toolchain
 
@@ -130,18 +139,23 @@ xcodes select
 xcodebuild -version
 ```
 
-`xcodes select` reads `.xcode-version`. Without `xcodes`, select the same version under
-**Xcode > Settings > Locations > Command Line Tools**, or set the full Xcode path for the current
-shell. Adjust the path to match the local installation:
+`xcodes select` reads `.xcode-version`, which records the recommended stable toolchain rather than an
+exact build requirement. Newer Xcode versions are accepted by the repository checks. Without
+`xcodes`, select any compatible full Xcode under **Xcode > Settings > Locations > Command Line
+Tools**, or set its path for the current shell:
 
 ```sh
-export DEVELOPER_DIR="/Applications/Xcode-27.0.0-Beta.6.app/Contents/Developer"
+export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
 xcodebuild -version
 ```
 
 If `xcodebuild` reports `/Library/Developer/CommandLineTools` as the active developer directory,
 the standalone Command Line Tools are still selected. Select the full Xcode installation before
 continuing.
+
+`make quality` checks capabilities rather than exact identity: Xcode must be at least 26.6, expose a
+macOS 26 or newer SDK, and understand the Swift 6.2 package manifest. Xcode 27 and later can
+therefore be used for forward-compatibility testing without changing repository metadata.
 
 ### Build and Run with Xcode
 
@@ -179,8 +193,9 @@ open .build/xcode/Build/Products/Debug/Matcha.app
 
 Debug builds use local ad-hoc signing and do not require an Apple Developer account. For a Release
 build, change `-configuration Debug` to `-configuration Release`; the result is written to
-`.build/xcode/Build/Products/Release/Matcha.app`. Distribution builds should be archived through
-**Product > Archive** in Xcode and configured with the appropriate signing and notarization.
+`.build/xcode/Build/Products/Release/Matcha.app`. Distribution builds are created only by the
+protected release workflow. See [RELEASING.md](RELEASING.md) for signing, notarization, packaging,
+and recovery details.
 
 App Sandbox is currently disabled because protocol clients may provide arbitrary local absolute
 paths for message attachments. A sandboxed app cannot read those paths without user-mediated
@@ -200,15 +215,19 @@ The script runs strict formatting checks, the SwiftPM test suite with warnings t
 and a complete macOS application build with warnings treated as errors. It stops at the first
 failure.
 
+The same layers can be run independently through the repository Makefile:
+
+```sh
+make quality
+make test
+make build
+make analyze
+```
+
 To apply formatting changes, run:
 
 ```sh
-swift format format \
-  --configuration .swift-format \
-  --in-place \
-  --parallel \
-  --recursive \
-  Package.swift App Sources Tests
+make format
 ```
 
 The command lists source roots explicitly to avoid generated files under `.build`. Run
@@ -241,3 +260,9 @@ use Network.framework, CryptoKit, and UniformTypeIdentifiers, respectively.
 Matcha for macOS is distributed under the [GNU Affero General Public License v3.0](LICENSE). The
 original [Matcha](https://github.com/A-kirami/matcha) project's code is Copyright © 2023 Akirami and
 is licensed under the GNU AGPL v3.0; its logo is separately licensed under CC BY-NC-ND.
+
+## Contributing and Support
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development and pull-request workflow,
+[SUPPORT.md](SUPPORT.md) for public support requests, and [SECURITY.md](SECURITY.md) for private
+vulnerability reporting and the repository's security boundaries.

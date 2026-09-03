@@ -1,0 +1,10 @@
+// Release metadata shared by every application configuration.
+CURRENT_PROJECT_VERSION = 1
+MARKETING_VERSION = 0.1.0
+
+// Every distributable archive must run on both supported Mac architectures.
+ARCHS[config=Release] = arm64 x86_64
+ONLY_ACTIVE_ARCH[config=Release] = NO
+
+// Xcode builds use the same warning policy as the SwiftPM quality gate.
+SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
