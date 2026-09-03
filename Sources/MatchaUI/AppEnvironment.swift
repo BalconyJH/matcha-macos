@@ -1030,9 +1030,9 @@ public enum ProtocolChoice: String, Codable, Sendable, CaseIterable, Identifiabl
 
     public var displayName: String {
         switch self {
-        case .oneBotV11: return "OneBot V11 Standard"
-        case .oneBotV12: return "OneBot V12 Standard"
-        case .milky: return "Milky 1.3"
+        case .oneBotV11: return "OneBot Protocol V11"
+        case .oneBotV12: return "OneBot Protocol V12"
+        case .milky: return "Milky Protocol V1.3"
         }
     }
 

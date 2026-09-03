@@ -111,32 +111,71 @@ JSON Lines records and a structured summary, without overwriting previous export
 
 ## Build and Run
 
-Matcha 要求 macOS 26 或更高版本，并需要完整安装 Xcode。仓库中的 `.xcode-version` 固定了
-当前验证过的 Xcode 版本；Command Line Tools 不包含 SwiftData、SwiftUI 与 Swift Testing
-所需的完整编译器插件。
+### 前置条件
 
-```sh
-open Matcha.xcodeproj
-```
+- macOS 26 或更高版本。
+- 完整安装 `.xcode-version` 指定的 Xcode（当前为 Xcode 27.0 beta 6）。仅安装 Command Line
+  Tools 不足以提供所需的完整 macOS SDK 与 Swift 编译器插件。
+- 可选安装 `xcodes`，用于按仓库版本文件选择 Xcode。
 
-在 Xcode 中选择共享 scheme `Matcha App` 与运行目标 `My Mac`，然后使用 Run。Xcode App target
-是 `.app` bundle、Info.plist、资源、签名和 Archive 的唯一来源；`Package.swift` 只定义应用
-依赖的 Swift modules 与 package tests。
+### 选择 Xcode 工具链
 
-命令行构建使用同一个共享 scheme：
+若已安装 `xcodes`，在仓库根目录运行：
 
 ```sh
 xcodes select
+xcodebuild -version
+```
+
+`xcodes select` 会读取 `.xcode-version`。若不使用 `xcodes`，可以在 Xcode 的
+**Settings > Locations > Command Line Tools** 中选择相同版本，或只为当前 shell 指定完整
+Xcode；路径需与本机安装位置一致：
+
+```sh
+export DEVELOPER_DIR="/Applications/Xcode-27.0.0-Beta.6.app/Contents/Developer"
+xcodebuild -version
+```
+
+若 `xcodebuild` 报告当前 developer directory 是 `/Library/Developer/CommandLineTools`，说明
+仍在使用独立的 Command Line Tools，需要先完成上述选择。
+
+### 使用 Xcode 构建与运行
+
+使用所选版本的 Xcode 打开工程：
+
+```sh
+xed Matcha.xcodeproj
+```
+
+选择共享 scheme `Matcha App` 与运行目标 `My Mac`，然后使用 **Product > Run**（`⌘R`）。
+Xcode App target 是 `.app` bundle、Info.plist、资源、签名和 Archive 的唯一来源；
+`Package.swift` 只定义应用依赖的 Swift modules 与 package tests，因此 `swift run` 不会生成
+可运行的 Matcha App。
+
+### 使用命令行构建与运行
+
+命令行构建使用同一个共享 scheme，并将 Derived Data 放入已被 Git 忽略的固定目录：
+
+```sh
 xcodebuild \
   -project Matcha.xcodeproj \
   -scheme "Matcha App" \
   -configuration Debug \
-  -destination "platform=macOS" \
+  -destination "generic/platform=macOS" \
+  -derivedDataPath .build/xcode \
   build
 ```
 
-`xcodes select` 会读取 `.xcode-version`。未使用 `xcodes` 时，可在 Xcode 的 Locations 设置中
-选择相同版本，或为命令显式设置 `DEVELOPER_DIR`。
+构建成功后运行：
+
+```sh
+open .build/xcode/Build/Products/Debug/Matcha.app
+```
+
+Debug 构建使用本地 ad-hoc 签名，无需 Apple Developer 账号。Release 构建需将
+`-configuration Debug` 改为 `-configuration Release`；产物位于
+`.build/xcode/Build/Products/Release/Matcha.app`。用于分发时应通过 Xcode 的
+**Product > Archive** 生成 archive，并配置相应的签名与公证流程。
 
 App Sandbox 当前保持关闭：协议端允许传入任意本机绝对文件路径作为消息附件，而 sandbox
 无法在没有用户交互授权的情况下读取这些路径。若将来面向 Mac App Store 分发，需要先重新
@@ -148,8 +187,9 @@ App Sandbox 当前保持关闭：协议端允许传入任意本机绝对文件�
 swift test
 ```
 
-测试由 SwiftPM 唯一拥有，以保留 package 内部的白盒测试边界。运行前同样需要让
-`xcode-select` 或 `DEVELOPER_DIR` 指向完整 Xcode。
+测试由 SwiftPM 唯一拥有，以保留 package 内部的白盒测试边界。该命令只构建 SwiftPM
+modules 与测试，不生成 `.app` bundle。运行前同样需要让 `xcode-select` 或
+`DEVELOPER_DIR` 指向完整 Xcode。
 
 与真实 `nonebot-adapter-milky` 进程的联调测试默认禁用。启用时需显式提供
 `MATCHA_LIVE_MILKY_API_PORT`、`MATCHA_LIVE_MILKY_TOKEN` 与

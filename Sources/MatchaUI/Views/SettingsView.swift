@@ -612,7 +612,7 @@ private struct RoleAssignmentRow: View {
                 }
             }
             .labelsHidden()
-            .frame(minWidth: 220)
+            .frame(minWidth: 220, alignment: .trailing)
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: systemImage)
