@@ -181,6 +181,32 @@ App Sandbox 当前保持关闭：协议端允许传入任意本机绝对文件�
 无法在没有用户交互授权的情况下读取这些路径。若将来面向 Mac App Store 分发，需要先重新
 设计该文件传输契约，不能只打开 sandbox 开关。
 
+## Quality Checks
+
+仓库使用所选 Xcode 工具链内置的 `swift format`，规则固定在 `.swift-format`。在仓库根目录
+运行统一检查入口：
+
+```sh
+./script/check.sh
+```
+
+该脚本依次执行严格格式检查、启用 warnings-as-errors 的 SwiftPM 测试，以及启用
+warnings-as-errors 的完整 macOS App 构建。任一步失败都会立即停止。
+
+需要写回格式时，显式运行：
+
+```sh
+swift format format \
+  --configuration .swift-format \
+  --in-place \
+  --parallel \
+  --recursive \
+  Package.swift App Sources Tests
+```
+
+命令刻意只列出源码入口，避免递归扫描 `.build` 中的生成文件。格式化后应再次运行
+`./script/check.sh`。
+
 ## Testing
 
 ```sh
