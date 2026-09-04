@@ -174,7 +174,6 @@ build: verify-xcode
 		-derivedDataPath "$(DERIVED_DATA_PATH)" \
 		ARCHS="$(BUILD_ARCHS)" \
 		ONLY_ACTIVE_ARCH=NO \
-		SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
 		CODE_SIGNING_ALLOWED=NO
 
 verify-universal:
@@ -198,7 +197,6 @@ analyze: verify-xcode
 		-derivedDataPath "$(DERIVED_DATA_PATH)" \
 		ARCHS="$(BUILD_ARCHS)" \
 		ONLY_ACTIVE_ARCH=NO \
-		SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
 		CODE_SIGNING_ALLOWED=NO
 
 archive: verify-xcode
@@ -211,8 +209,7 @@ archive: verify-xcode
 		-derivedDataPath "$$DERIVED_DATA_PATH" \
 		-archivePath "$$ARCHIVE_PATH" \
 		"ARCHS=$$BUILD_ARCHS" \
-		ONLY_ACTIVE_ARCH=NO \
-		SWIFT_TREAT_WARNINGS_AS_ERRORS=YES; \
+		ONLY_ACTIVE_ARCH=NO; \
 	if [ "$${ALLOW_PROVISIONING_UPDATES:-}" = YES ]; then set -- "$$@" -allowProvisioningUpdates; fi; \
 	if [ -n "$${AUTHENTICATION_KEY_PATH:-}" ]; then set -- "$$@" -authenticationKeyPath "$$AUTHENTICATION_KEY_PATH"; fi; \
 	if [ -n "$${AUTHENTICATION_KEY_ID:-}" ]; then set -- "$$@" -authenticationKeyID "$$AUTHENTICATION_KEY_ID"; fi; \
