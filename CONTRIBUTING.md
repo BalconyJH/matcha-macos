@@ -39,7 +39,7 @@ Apply repository formatting with `make format`, then rerun the complete gate.
 
 ## Change Guidelines
 
-- Preserve the boundary between `MatchaCore`, transports, protocol implementations, and UI code.
+- Preserve the boundary between `ReiCore`, transports, protocol implementations, and UI code.
 - Add regression tests for fixes and tests for new protocol behavior.
 - Keep OneBot and Milky wire behavior compatible with their documented protocol versions.
 - Avoid unrelated formatting and generated Xcode user-state changes.

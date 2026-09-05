@@ -2,44 +2,44 @@
 import PackageDescription
 
 let package = Package(
-    name: "Matcha",
+    name: "Rei",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "MatchaLogging", targets: ["MatchaLogging"]),
-        .library(name: "MatchaUI", targets: ["MatchaUI"]),
+        .library(name: "ReiLogging", targets: ["ReiLogging"]),
+        .library(name: "ReiUI", targets: ["ReiUI"]),
     ],
     dependencies: [],
     targets: [
-        .target(name: "MatchaLogging"),
+        .target(name: "ReiLogging"),
 
         // Domain model and storage. Knows nothing about any wire protocol.
-        .target(name: "MatchaCore"),
+        .target(name: "ReiCore"),
 
         // Transports: WebSocket server/client and a minimal HTTP/1.1 server,
         // all on Network.framework.
-        .target(name: "MatchaTransport", dependencies: ["MatchaCore"]),
+        .target(name: "ReiTransport", dependencies: ["ReiCore"]),
 
         // The protocol-neutral implementation contract shared by OneBot and Milky.
-        .target(name: "MatchaProtocol", dependencies: ["MatchaCore", "MatchaTransport"]),
+        .target(name: "ReiProtocol", dependencies: ["ReiCore", "ReiTransport"]),
 
         // Peer protocol implementations.
-        .target(name: "MatchaOneBot", dependencies: ["MatchaProtocol"]),
-        .target(name: "MatchaMilky", dependencies: ["MatchaProtocol"]),
+        .target(name: "ReiOneBot", dependencies: ["ReiProtocol"]),
+        .target(name: "ReiMilky", dependencies: ["ReiProtocol"]),
 
         // AppKit/SwiftUI user interface.
         .target(
-            name: "MatchaUI",
+            name: "ReiUI",
             dependencies: [
-                "MatchaCore", "MatchaProtocol", "MatchaOneBot", "MatchaMilky", "MatchaLogging",
+                "ReiCore", "ReiProtocol", "ReiOneBot", "ReiMilky", "ReiLogging",
             ]
         ),
 
         .testTarget(
-            name: "MatchaTests",
+            name: "ReiTests",
             dependencies: [
-                "MatchaCore", "MatchaTransport", "MatchaProtocol", "MatchaOneBot", "MatchaMilky",
-                "MatchaLogging",
-                .target(name: "MatchaUI"),
+                "ReiCore", "ReiTransport", "ReiProtocol", "ReiOneBot", "ReiMilky",
+                "ReiLogging",
+                .target(name: "ReiUI"),
             ]
         ),
     ]

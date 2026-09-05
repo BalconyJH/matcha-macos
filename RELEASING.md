@@ -1,6 +1,6 @@
 # Releasing
 
-Matcha is distributed directly to users as a Developer ID-signed and Apple-notarized macOS
+Rei is distributed directly to users as a Developer ID-signed and Apple-notarized macOS
 application. The current file-access contract requires App Sandbox to remain disabled, so this
 pipeline does not produce a Mac App Store build.
 
@@ -92,8 +92,8 @@ publishing again. A version bump is therefore the explicit release decision.
 
 Each GitHub Release contains:
 
-- `Matcha-vMAJOR.MINOR.PATCH.zip`, containing the stapled application bundle
-- `Matcha-vMAJOR.MINOR.PATCH.dmg`, a signed, notarized, and stapled drag-to-Applications image
+- `Rei-vMAJOR.MINOR.PATCH.zip`, containing the stapled application bundle
+- `Rei-vMAJOR.MINOR.PATCH.dmg`, a signed, notarized, and stapled drag-to-Applications image
 - `SHA256SUMS`, covering the ZIP and DMG
 
 The matching dSYM archive and notarization logs are retained as restricted workflow artifacts for
@@ -103,8 +103,8 @@ After downloading a release, verify it with:
 
 ```sh
 shasum -a 256 -c SHA256SUMS
-gh attestation verify Matcha-v0.1.0.zip --repo BalconyJH/matcha-macos
-spctl --assess --type execute --verbose=4 /path/to/Matcha.app
+gh attestation verify Rei-v0.1.0.zip --repo Kiyorae/rei
+spctl --assess --type execute --verbose=4 /path/to/Rei.app
 ```
 
 ## Recovery

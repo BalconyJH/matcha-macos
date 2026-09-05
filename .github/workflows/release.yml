@@ -151,15 +151,15 @@ jobs:
               [[ "$(jq -r '.prerelease' "$release_path")" != "false" ]] ||
               [[ "$(jq -r '.name' "$release_path")" != "$RELEASE_TAG" ]] ||
               [[ "$(jq -r '.author.login' "$release_path")" != "github-actions[bot]" ]] ||
-              [[ "$(jq -r --arg marker "<!-- matcha-release-source:$source_sha -->" \
+              [[ "$(jq -r --arg marker "<!-- rei-release-source:$source_sha -->" \
                 '.body | startswith($marker)' "$release_path")" != "true" ]]; then
               echo "::error::Published release is mutable or is not owned by this release workflow."
               exit 1
             fi
 
             expected_names=(
-              "Matcha-v$version.zip"
-              "Matcha-v$version.dmg"
+              "Rei-v$version.zip"
+              "Rei-v$version.dmg"
               "SHA256SUMS"
             )
             if [[ "$(jq '.assets | length' "$release_path")" -ne "${#expected_names[@]}" ]]; then
@@ -198,8 +198,8 @@ jobs:
 
             checksum_names=$(awk '{ print $2 }' "$published_path/SHA256SUMS")
             expected_checksum_names=$(printf '%s\n' \
-              "Matcha-v$version.zip" \
-              "Matcha-v$version.dmg")
+              "Rei-v$version.zip" \
+              "Rei-v$version.dmg")
             if [[ "$checksum_names" != "$expected_checksum_names" ]] ||
               ! awk 'NF != 2 || $1 !~ /^[0-9a-f]{64}$/ { exit 1 } END { exit NR == 2 ? 0 : 1 }' \
                 "$published_path/SHA256SUMS"; then
@@ -302,9 +302,9 @@ jobs:
 
           certificate_path="$RUNNER_TEMP/developer-id-application.p12"
           notary_key_path="$RUNNER_TEMP/AuthKey.p8"
-          keychain_path="$RUNNER_TEMP/matcha-release.keychain-db"
+          keychain_path="$RUNNER_TEMP/rei-release.keychain-db"
           keychain_password=$(openssl rand -hex 32)
-          notary_profile="matcha-release"
+          notary_profile="rei-release"
 
           printf '%s' "$APPLE_DEVELOPER_ID_CERTIFICATE_P12_BASE64" | /usr/bin/base64 -D > "$certificate_path"
           printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | /usr/bin/base64 -D > "$notary_key_path"
@@ -362,7 +362,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          archive_path="$RUNNER_TEMP/Matcha.xcarchive"
+          archive_path="$RUNNER_TEMP/Rei.xcarchive"
           export_path="$RUNNER_TEMP/export"
           options_plist="$RUNNER_TEMP/ExportOptions.plist"
 
@@ -391,11 +391,11 @@ jobs:
             EXPORT_PATH="$export_path" \
             EXPORT_OPTIONS_PLIST="$options_plist"
 
-          app_count=$(find "$export_path" -maxdepth 2 -type d -name 'Matcha.app' | wc -l | tr -d ' ')
-          app_path=$(find "$export_path" -maxdepth 2 -type d -name 'Matcha.app' -print -quit)
-          dsym_path="$archive_path/dSYMs/Matcha.app.dSYM"
+          app_count=$(find "$export_path" -maxdepth 2 -type d -name 'Rei.app' | wc -l | tr -d ' ')
+          app_path=$(find "$export_path" -maxdepth 2 -type d -name 'Rei.app' -print -quit)
+          dsym_path="$archive_path/dSYMs/Rei.app.dSYM"
           if [[ "$app_count" != "1" || ! -d "$app_path" || ! -d "$dsym_path" ]]; then
-            echo "::error::Export did not produce exactly one Matcha.app and its dSYM."
+            echo "::error::Export did not produce exactly one Rei.app and its dSYM."
             find "$export_path" "$archive_path" -maxdepth 3 -print
             exit 1
           fi
@@ -420,7 +420,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          submission_zip="$RUNNER_TEMP/Matcha-notarization.zip"
+          submission_zip="$RUNNER_TEMP/Rei-notarization.zip"
           result_path="$RUNNER_TEMP/app-notary-result.json"
           log_path="$RUNNER_TEMP/app-notary-log.json"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$submission_zip"
@@ -463,14 +463,14 @@ jobs:
           dist_path="$RUNNER_TEMP/dist"
           ./script/package-release.sh "$APP_PATH" "$DSYM_PATH" "$VERSION" "$dist_path"
 
-          zip_path="$dist_path/Matcha-v$VERSION.zip"
-          dmg_path="$dist_path/Matcha-v$VERSION.dmg"
-          dsym_zip_path="$dist_path/Matcha-v$VERSION.dSYM.zip"
+          zip_path="$dist_path/Rei-v$VERSION.zip"
+          dmg_path="$dist_path/Rei-v$VERSION.dmg"
+          dsym_zip_path="$dist_path/Rei-v$VERSION.dSYM.zip"
           codesign \
             --force \
             --sign "$SIGNING_IDENTITY_SHA" \
             --timestamp \
-            --identifier dev.matcha.macos.dmg \
+            --identifier dev.rei.macos.dmg \
             "$dmg_path"
 
           {
@@ -526,7 +526,7 @@ jobs:
           extracted_path="$RUNNER_TEMP/extracted-release"
           mkdir -p "$extracted_path"
           ditto -x -k "$ZIP_PATH" "$extracted_path"
-          packaged_app="$extracted_path/Matcha.app"
+          packaged_app="$extracted_path/Rei.app"
 
           ./script/verify-release.sh \
             "$packaged_app" \
@@ -549,8 +549,8 @@ jobs:
           (
             cd "$DIST_PATH"
             shasum -a 256 \
-              "Matcha-v$VERSION.zip" \
-              "Matcha-v$VERSION.dmg" > SHA256SUMS
+              "Rei-v$VERSION.zip" \
+              "Rei-v$VERSION.dmg" > SHA256SUMS
             shasum -a 256 -c SHA256SUMS
           )
 
@@ -558,12 +558,12 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
-          security delete-keychain "$RUNNER_TEMP/matcha-release.keychain-db" 2>/dev/null || true
+          security delete-keychain "$RUNNER_TEMP/rei-release.keychain-db" 2>/dev/null || true
           rm -f \
             "$RUNNER_TEMP/developer-id-application.p12" \
             "$RUNNER_TEMP/AuthKey.p8" \
             "$RUNNER_TEMP/ExportOptions.plist" \
-            "$RUNNER_TEMP/Matcha-notarization.zip"
+            "$RUNNER_TEMP/Rei-notarization.zip"
 
       - name: Upload release assets
         if: ${{ success() }}
@@ -571,8 +571,8 @@ jobs:
         with:
           name: release-assets
           path: |
-            ${{ runner.temp }}/dist/Matcha-v${{ needs.validate.outputs.version }}.zip
-            ${{ runner.temp }}/dist/Matcha-v${{ needs.validate.outputs.version }}.dmg
+            ${{ runner.temp }}/dist/Rei-v${{ needs.validate.outputs.version }}.zip
+            ${{ runner.temp }}/dist/Rei-v${{ needs.validate.outputs.version }}.dmg
             ${{ runner.temp }}/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -581,8 +581,8 @@ jobs:
         if: ${{ success() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: Matcha-v${{ needs.validate.outputs.version }}-debug-symbols
-          path: ${{ runner.temp }}/dist/Matcha-v${{ needs.validate.outputs.version }}.dSYM.zip
+          name: Rei-v${{ needs.validate.outputs.version }}-debug-symbols
+          path: ${{ runner.temp }}/dist/Rei-v${{ needs.validate.outputs.version }}.dSYM.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -590,7 +590,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: Matcha-v${{ needs.validate.outputs.version }}-notarization
+          name: Rei-v${{ needs.validate.outputs.version }}-notarization
           path: |
             ${{ runner.temp }}/*-notary-result.json
             ${{ runner.temp }}/*-notary-log.json
@@ -629,8 +629,8 @@ jobs:
         run: |
           set -euo pipefail
           expected=(
-            "Matcha-v$VERSION.zip"
-            "Matcha-v$VERSION.dmg"
+            "Rei-v$VERSION.zip"
+            "Rei-v$VERSION.dmg"
             "SHA256SUMS"
           )
           file_count=$(find dist -maxdepth 1 -type f | wc -l | tr -d ' ')
@@ -656,8 +656,8 @@ jobs:
           set -euo pipefail
 
           expected_assets=(
-            "dist/Matcha-v$VERSION.zip"
-            "dist/Matcha-v$VERSION.dmg"
+            "dist/Rei-v$VERSION.zip"
+            "dist/Rei-v$VERSION.dmg"
             "dist/SHA256SUMS"
           )
           release_path="$RUNNER_TEMP/release.json"
@@ -755,7 +755,7 @@ jobs:
               "/repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
               --input -)
           {
-            echo "<!-- matcha-release-source:$SOURCE_SHA -->"
+            echo "<!-- rei-release-source:$SOURCE_SHA -->"
             echo
             jq -r '.body' <<< "$notes_json"
           } > "$notes_path"
@@ -789,7 +789,7 @@ jobs:
 
           if [[ "$(jq -r '.draft' "$release_path")" == "false" ]]; then
             if [[ "$(jq -r '.immutable' "$release_path")" != "true" ]] ||
-              [[ "$(jq -r --arg marker "<!-- matcha-release-source:$SOURCE_SHA -->" \
+              [[ "$(jq -r --arg marker "<!-- rei-release-source:$SOURCE_SHA -->" \
                 '.body | startswith($marker)' "$release_path")" != "true" ]]; then
               echo "::error::Published release is mutable or is not bound to the validated source."
               exit 1
@@ -820,8 +820,8 @@ jobs:
             done
             checksum_names=$(awk '{ print $2 }' "$published_path/SHA256SUMS")
             expected_checksum_names=$(printf '%s\n' \
-              "Matcha-v$VERSION.zip" \
-              "Matcha-v$VERSION.dmg")
+              "Rei-v$VERSION.zip" \
+              "Rei-v$VERSION.dmg")
             if [[ "$checksum_names" != "$expected_checksum_names" ]] ||
               ! awk 'NF != 2 || $1 !~ /^[0-9a-f]{64}$/ { exit 1 } END { exit NR == 2 ? 0 : 1 }' \
                 "$published_path/SHA256SUMS"; then
@@ -839,8 +839,8 @@ jobs:
           fi
 
           unexpected_asset_count=$(jq \
-            --arg zip "Matcha-v$VERSION.zip" \
-            --arg dmg "Matcha-v$VERSION.dmg" \
+            --arg zip "Rei-v$VERSION.zip" \
+            --arg dmg "Rei-v$VERSION.dmg" \
             '[.assets[].name | select(. != $zip and . != $dmg and . != "SHA256SUMS")] | length' \
             "$release_path")
           if [[ "$unexpected_asset_count" -ne 0 ]]; then
@@ -956,8 +956,8 @@ jobs:
           fi
 
           expected_assets=(
-            "dist/Matcha-v$VERSION.zip"
-            "dist/Matcha-v$VERSION.dmg"
+            "dist/Rei-v$VERSION.zip"
+            "dist/Rei-v$VERSION.dmg"
             "dist/SHA256SUMS"
           )
           if [[ "$(jq '.assets | length' "$release_path")" -ne "${#expected_assets[@]}" ]]; then

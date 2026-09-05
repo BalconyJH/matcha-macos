@@ -1,21 +1,28 @@
-# Matcha for macOS
+# Rei for macOS
 
-[![CI](https://github.com/BalconyJH/matcha-macos/actions/workflows/ci.yml/badge.svg)](https://github.com/BalconyJH/matcha-macos/actions/workflows/ci.yml)
+[![CI](https://github.com/Kiyorae/rei/actions/workflows/ci.yml/badge.svg)](https://github.com/Kiyorae/rei/actions/workflows/ci.yml)
 
-Matcha is a development tool that simulates a chat platform. It presents itself as QQ: the bot
+> [!WARNING]
+> Rei is under active development. It does not yet fully represent the capabilities or behavior of
+> the supported protocols and must not be treated as a complete protocol specification or a
+> production-parity implementation.
+
+Rei is a development tool that simulates a chat platform. It presents itself as QQ: the bot
 framework under test connects to it as if it were a real platform, while you use the app to send
 messages as any identity, create groups, and send friend requests. The framework receives the same
 events and action responses it would receive in production. No real account is required, there is no
 risk-control system to worry about, and you do not need another person to help reproduce an issue.
 
-Matcha for macOS is an independent native macOS rewrite of
-[A-kirami/matcha](https://github.com/A-kirami/matcha), originally created by Akirami. The upstream
-project uses Vue and Tauri; this implementation uses AppKit and SwiftUI and depends only on Apple
-system frameworks.
+## Project Provenance
+
+Rei's inspiration and original design come from the upstream
+[project by Akirami](https://github.com/A-kirami/matcha). Rei is an independent native macOS
+implementation: the upstream project uses Vue and Tauri, while Rei uses AppKit and SwiftUI and
+depends only on Apple system frameworks.
 
 ## Releases
 
-[GitHub Releases](https://github.com/BalconyJH/matcha-macos/releases) provide Universal 2 ZIP and
+[GitHub Releases](https://github.com/Kiyorae/rei/releases) provide Universal 2 ZIP and
 DMG downloads for macOS 26 or later. Published application bundles are signed with Developer ID,
 notarized by Apple, stapled for offline Gatekeeper verification, and accompanied by SHA-256
 checksums and GitHub build provenance. See [RELEASING.md](RELEASING.md) for the complete trust and
@@ -27,23 +34,23 @@ recovery model.
 - OneBot V12, with forward and reverse WebSocket connections
 - Milky 1.3, with its HTTP API, `/event` WebSocket, and optional WebHook event sinks
 
-Matcha is the simulated messaging platform and implements the protocol-facing endpoint. It does not
+Rei is the simulated messaging platform and implements the protocol-facing endpoint. It does not
 provide a NoneBot adapter plugin. `nonebot-adapter-onebot` and `nonebot-adapter-milky` are consumers:
-they call Matcha's protocol endpoints and receive the events Matcha produces. OneBot dispatches by
+they call Rei's protocol endpoints and receive the events Rei produces. OneBot dispatches by
 the `action` field over a persistent connection, while Milky dispatches API calls by URL path over
-HTTP. All simulated state remains in Matcha.
+HTTP. All simulated state remains in Rei.
 
 ## Connecting NoneBot
 
 OneBot defines forward and reverse connections from the perspective of the **protocol
-implementation**. Matcha is the protocol implementation here:
+implementation**. Rei is the protocol implementation here:
 
-| Mode | Matcha role | NoneBot role and configuration |
+| Mode | Rei role | NoneBot role and configuration |
 | --- | --- | --- |
-| Forward WebSocket | Server; waits for a connection | Use a `WebSocketClient` driver. Point V11 `ONEBOT_WS_URLS` or V12 `ONEBOT_V12_WS_URLS` at Matcha. |
-| Reverse WebSocket (recommended) | Client; initiates the connection | V11 uses `ReverseDriver`; V12 uses an ASGI driver such as `DRIVER=~fastapi`. Matcha connects to NoneBot's listening address. |
+| Forward WebSocket | Server; waits for a connection | Use a `WebSocketClient` driver. Point V11 `ONEBOT_WS_URLS` or V12 `ONEBOT_V12_WS_URLS` at Rei. |
+| Reverse WebSocket (recommended) | Client; initiates the connection | V11 uses `ReverseDriver`; V12 uses an ASGI driver such as `DRIVER=~fastapi`. Rei connects to NoneBot's listening address. |
 
-For a reverse connection, select **WebSocket Client (Reverse Connection)** in Matcha and enter
+For a reverse connection, select **WebSocket Client (Reverse Connection)** in Rei and enter
 NoneBot's `HOST`, `PORT`, and the appropriate path:
 
 - OneBot V11: `/onebot/v11/ws`
@@ -51,58 +58,58 @@ NoneBot's `HOST`, `PORT`, and the appropriate path:
 
 For example, if NoneBot listens on `127.0.0.1:8080`, the full V12 address is
 `ws://127.0.0.1:8080/onebot/v12/ws`. If NoneBot has an Access Token configured, enter the same value
-in Matcha. When the two processes run in different containers, virtual machines, or hosts, do not
-use `127.0.0.1` to address the other process. Use a service name or address that Matcha can actually
+in Rei. When the two processes run in different containers, virtual machines, or hosts, do not
+use `127.0.0.1` to address the other process. Use a service name or address that Rei can actually
 reach. See the [NoneBot OneBot connection guide](https://onebot.adapters.nonebot.dev/docs/guide/setup/)
 for the complete configuration.
 
 ### Milky
 
 Milky is one protocol service rather than a choice between mutually exclusive connection modes.
-Starting it always exposes these endpoints on Matcha's configured `host:port`:
+Starting it always exposes these endpoints on Rei's configured `host:port`:
 
 - `http://host:port/api/<action>`: API called by consumers
 - `ws://host:port/event`: event stream consumed over WebSocket
 
-NoneBot's `nonebot-adapter-milky` can consume `/event` with `MILKY_CLIENTS`. For example, if Matcha
+NoneBot's `nonebot-adapter-milky` can consume `/event` with `MILKY_CLIENTS`. For example, if Rei
 listens on `127.0.0.1:5700`:
 
 ```dotenv
 DRIVER=~aiohttp+~fastapi
-MILKY_CLIENTS='[{"host":"127.0.0.1","port":"5700","access_token":"the same Token as Matcha","secure":false}]'
+MILKY_CLIENTS='[{"host":"127.0.0.1","port":"5700","access_token":"the same Token as Rei","secure":false}]'
 ```
 
 WebHooks are optional additional event sinks; adding one does not disable `/event`. To exercise
-NoneBot's `MILKY_WEBHOOK` consumer, add `http://127.0.0.1:8080/milky/` under Matcha's **Event
+NoneBot's `MILKY_WEBHOOK` consumer, add `http://127.0.0.1:8080/milky/` under Rei's **Event
 WebHooks**, then configure NoneBot with:
 
 ```dotenv
 DRIVER=~aiohttp+~fastapi
-MILKY_WEBHOOK='{"host":"127.0.0.1","port":"5700","access_token":"the same Token as Matcha","secure":false}'
+MILKY_WEBHOOK='{"host":"127.0.0.1","port":"5700","access_token":"the same Token as Rei","secure":false}'
 ```
 
-The `MILKY_WEBHOOK` host and port point back to Matcha's API listener; they are not NoneBot's own
+The `MILKY_WEBHOOK` host and port point back to Rei's API listener; they are not NoneBot's own
 listening address. The configured token is used for API requests, `/event` connections, and WebHook
-delivery. Matcha can serve `MILKY_CLIENTS` consumers and any number of WebHook destinations at the
+delivery. Rei can serve `MILKY_CLIENTS` consumers and any number of WebHook destinations at the
 same time. A consumer attached through both routes receives the same event twice, so that topology
 should be intentional. The app reports **Serving** as soon as the API and event service is ready; it
 does not wait for a consumer to connect before allowing simulated messages.
 
 ## Architecture
 
-- `MatchaCore` contains the domain model and storage. Users, groups, and messages are persisted with
+- `ReiCore` contains the domain model and storage. Users, groups, and messages are persisted with
   SwiftData, while media uses content-addressed file storage. This module knows nothing about any
   wire protocol.
-- `MatchaTransport` is the transport layer. Its WebSocket server and client and minimal HTTP/1.1
+- `ReiTransport` is the transport layer. Its WebSocket server and client and minimal HTTP/1.1
   server are all built on Network.framework.
-- `MatchaProtocol` contains the protocol-neutral translation/session boundary and `PlatformService`.
-- `MatchaOneBot` and `MatchaMilky` implement the protocol endpoints consumed by framework adapters.
-- `MatchaLogging` provides typed application diagnostics written to OSLog, rotating JSON Lines files,
+- `ReiProtocol` contains the protocol-neutral translation/session boundary and `PlatformService`.
+- `ReiOneBot` and `ReiMilky` implement the protocol endpoints consumed by framework adapters.
+- `ReiLogging` provides typed application diagnostics written to OSLog, rotating JSON Lines files,
   and a bounded in-memory window. Log events cannot contain access tokens, message bodies, or raw
   protocol payloads.
-- `MatchaUI` provides the SwiftUI and AppKit interface, including a dedicated application log
+- `ReiUI` provides the SwiftUI and AppKit interface, including a dedicated application log
   console. Raw protocol traffic remains available in a separate inspector.
-- `App/MatchaApplication.swift` is the composition root for the Xcode application target. It owns
+- `App/ReiApplication.swift` is the composition root for the Xcode application target. It owns
   the application lifecycle, window scenes, and menu bar; the remaining implementation stays in
   SwiftPM modules.
 
@@ -125,7 +132,7 @@ JSON Lines records and a structured summary, without overwriting previous export
 
 ### Prerequisites
 
-- macOS 26 or later to run Matcha; macOS 26.2 or later for the recommended development toolchain.
+- macOS 26 or later to run Rei; macOS 26.2 or later for the recommended development toolchain.
 - A full installation of Xcode 26.6 or newer with the macOS 26 SDK. Command Line Tools alone do not
   include the complete SDK and Swift compiler plugins required by this project.
 - Optionally, install `xcodes` to select the repository's recommended stable Xcode version.
@@ -162,13 +169,13 @@ therefore be used for forward-compatibility testing without changing repository 
 Open the project with the selected Xcode installation:
 
 ```sh
-xed Matcha.xcodeproj
+xed Rei.xcodeproj
 ```
 
-Select the shared `Matcha App` scheme and the `My Mac` destination, then choose
+Select the shared `Rei App` scheme and the `My Mac` destination, then choose
 **Product > Run** (`⌘R`). The Xcode application target is the sole source of the `.app` bundle,
 Info.plist, resources, signing, and archives. `Package.swift` defines the Swift modules and package
-tests used by the application, so `swift run` does not produce a runnable Matcha app.
+tests used by the application, so `swift run` does not produce a runnable Rei app.
 
 ### Build and Run from the Command Line
 
@@ -177,8 +184,8 @@ Git-ignored directory:
 
 ```sh
 xcodebuild \
-  -project Matcha.xcodeproj \
-  -scheme "Matcha App" \
+  -project Rei.xcodeproj \
+  -scheme "Rei App" \
   -configuration Debug \
   -destination "generic/platform=macOS" \
   -derivedDataPath .build/xcode \
@@ -188,12 +195,12 @@ xcodebuild \
 After a successful build, launch the app with:
 
 ```sh
-open .build/xcode/Build/Products/Debug/Matcha.app
+open .build/xcode/Build/Products/Debug/Rei.app
 ```
 
 Debug builds use local ad-hoc signing and do not require an Apple Developer account. For a Release
 build, change `-configuration Debug` to `-configuration Release`; the result is written to
-`.build/xcode/Build/Products/Release/Matcha.app`. Distribution builds are created only by the
+`.build/xcode/Build/Products/Release/Rei.app`. Distribution builds are created only by the
 protected release workflow. See [RELEASING.md](RELEASING.md) for signing, notarization, packaging,
 and recovery details.
 
@@ -244,9 +251,9 @@ builds only SwiftPM modules and tests; it does not produce an `.app` bundle. Ens
 `xcode-select` or `DEVELOPER_DIR` points to the full Xcode installation before running it.
 
 Live interoperability tests against a real `nonebot-adapter-milky` process are disabled by
-default. Enable them by setting `MATCHA_LIVE_MILKY_API_PORT`, `MATCHA_LIVE_MILKY_TOKEN`, and
-`MATCHA_LIVE_MILKY_SELF_ID`. WebHook scenarios also require `MATCHA_LIVE_MILKY_WEBHOOK_URL`;
-WebSocket scenarios require `MATCHA_LIVE_MILKY_EXPECT_WEBSOCKET=1`. These runtime values are never
+default. Enable them by setting `REI_LIVE_MILKY_API_PORT`, `REI_LIVE_MILKY_TOKEN`, and
+`REI_LIVE_MILKY_SELF_ID`. WebHook scenarios also require `REI_LIVE_MILKY_WEBHOOK_URL`;
+WebSocket scenarios require `REI_LIVE_MILKY_EXPECT_WEBSOCKET=1`. These runtime values are never
 written to the repository.
 
 ## Dependencies
@@ -257,9 +264,9 @@ use Network.framework, CryptoKit, and UniformTypeIdentifiers, respectively.
 
 ## License
 
-Matcha for macOS is distributed under the [GNU Affero General Public License v3.0](LICENSE). The
-original [Matcha](https://github.com/A-kirami/matcha) project's code is Copyright © 2023 Akirami and
-is licensed under the GNU AGPL v3.0; its logo is separately licensed under CC BY-NC-ND.
+Rei for macOS is distributed under the [GNU Affero General Public License v3.0](LICENSE). The
+[upstream project's](#project-provenance) code is Copyright © 2023 Akirami and is licensed under the
+GNU AGPL v3.0; its logo is separately licensed under CC BY-NC-ND.
 
 ## Contributing and Support
 

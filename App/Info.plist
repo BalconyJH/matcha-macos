@@ -32,7 +32,7 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Matcha needs to listen on a local port so the bot framework under test can connect.</string>
+	<string>Rei needs to listen on a local port so the bot framework under test can connect.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

@@ -42,7 +42,7 @@ for required_architecture in arm64 x86_64; do
 done
 
 mkdir -p "$output_directory"
-artifact_base="Matcha-v$version"
+artifact_base="Rei-v$version"
 zip_path="$output_directory/$artifact_base.zip"
 dmg_path="$output_directory/$artifact_base.dmg"
 dsym_zip_path="$output_directory/$artifact_base.dSYM.zip"
@@ -54,7 +54,7 @@ for output_path in "$zip_path" "$dmg_path" "$dsym_zip_path"; do
     fi
 done
 
-staging_root=$(mktemp -d "${TMPDIR:-/tmp}/matcha-package.XXXXXX")
+staging_root=$(mktemp -d "${TMPDIR:-/tmp}/rei-package.XXXXXX")
 cleanup() {
     rm -rf -- "$staging_root"
 }
@@ -65,10 +65,10 @@ ditto -c -k --keepParent "$dsym_path" "$dsym_zip_path"
 
 dmg_root="$staging_root/dmg"
 mkdir -p "$dmg_root"
-ditto "$app_path" "$dmg_root/Matcha.app"
+ditto "$app_path" "$dmg_root/Rei.app"
 ln -s /Applications "$dmg_root/Applications"
 hdiutil create \
-    -volname "Matcha $version" \
+    -volname "Rei $version" \
     -srcfolder "$dmg_root" \
     -format UDZO \
     "$dmg_path"

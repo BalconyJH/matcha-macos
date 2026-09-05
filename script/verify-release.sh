@@ -23,7 +23,7 @@ fi
 bundle_identifier=$(plutil -extract CFBundleIdentifier raw -o - "$info_plist")
 bundle_version=$(plutil -extract CFBundleShortVersionString raw -o - "$info_plist")
 bundle_build_number=$(plutil -extract CFBundleVersion raw -o - "$info_plist")
-if [[ "$bundle_identifier" != "dev.matcha.macos" ]]; then
+if [[ "$bundle_identifier" != "dev.rei.macos" ]]; then
     echo "Unexpected bundle identifier: $bundle_identifier" >&2
     exit 65
 fi

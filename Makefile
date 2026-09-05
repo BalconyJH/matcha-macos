@@ -1,16 +1,16 @@
-PROJECT := Matcha.xcodeproj
-SCHEME := Matcha App
+PROJECT := Rei.xcodeproj
+SCHEME := Rei App
 
 BUILD_CONFIGURATION ?= Release
 BUILD_DESTINATION ?= generic/platform=macOS
 BUILD_ARCHS ?= arm64 x86_64
 DERIVED_DATA_PATH ?= $(CURDIR)/.build/xcode
 
-ARCHIVE_PATH ?= $(CURDIR)/.build/archive/Matcha.xcarchive
+ARCHIVE_PATH ?= $(CURDIR)/.build/archive/Rei.xcarchive
 EXPORT_PATH ?= $(CURDIR)/.build/export
 EXPORT_OPTIONS_PLIST ?= $(CURDIR)/.build/ExportOptions.plist
 VERSION_CONFIGURATION := Configuration/Shared.xcconfig
-APP_PATH ?= $(DERIVED_DATA_PATH)/Build/Products/$(BUILD_CONFIGURATION)/Matcha.app
+APP_PATH ?= $(DERIVED_DATA_PATH)/Build/Products/$(BUILD_CONFIGURATION)/Rei.app
 MINIMUM_XCODE_VERSION := 26.6
 MINIMUM_MACOS_SDK_VERSION := 26.0
 
@@ -96,7 +96,7 @@ format:
 
 project-check:
 	plutil -lint App/Info.plist
-	plutil -lint Matcha.xcodeproj/project.pbxproj
+	plutil -lint Rei.xcodeproj/project.pbxproj
 	@set -e; \
 	version="$$( $(MAKE) --no-print-directory release-version )"; \
 	build_number="$$( $(MAKE) --no-print-directory release-build-number )"; \
@@ -112,8 +112,8 @@ project-check:
 		echo "Xcode release metadata does not match $(VERSION_CONFIGURATION)." >&2; \
 		exit 1; \
 	fi; \
-	onebot_version="$$(awk -F '"' '/public static let current = "[0-9]/ { value = $$2; count++ } END { if (count != 1) exit 1; print value }' Sources/MatchaOneBot/OneBotAdapter.swift)"; \
-	milky_version="$$(awk -F '"' '/"impl_version": "[0-9]/ { value = $$4; count++ } END { if (count != 1) exit 1; print value }' Sources/MatchaMilky/MilkyActions.swift)"; \
+	onebot_version="$$(awk -F '"' '/public static let current = "[0-9]/ { value = $$2; count++ } END { if (count != 1) exit 1; print value }' Sources/ReiOneBot/OneBotAdapter.swift)"; \
+	milky_version="$$(awk -F '"' '/"impl_version": "[0-9]/ { value = $$4; count++ } END { if (count != 1) exit 1; print value }' Sources/ReiMilky/MilkyActions.swift)"; \
 	if [ "$$onebot_version" != "$$version" ] || [ "$$milky_version" != "$$version" ]; then \
 		echo "Protocol implementation versions must match MARKETING_VERSION $$version." >&2; \
 		exit 1; \
@@ -178,7 +178,7 @@ build: verify-xcode
 
 verify-universal:
 	@set -e; \
-	executable="$${APP_PATH}/Contents/MacOS/Matcha"; \
+	executable="$${APP_PATH}/Contents/MacOS/Rei"; \
 	architectures="$$(lipo -archs "$$executable")"; \
 	for required_architecture in arm64 x86_64; do \
 		case " $$architectures " in \

@@ -3,10 +3,10 @@
 ## Reporting a Vulnerability
 
 Report suspected vulnerabilities through GitHub's
-[private vulnerability reporting](https://github.com/BalconyJH/matcha-macos/security/advisories/new).
+[private vulnerability reporting](https://github.com/Kiyorae/rei/security/advisories/new).
 Do not open a public issue or pull request before the maintainers have assessed the report.
 
-Include the affected Matcha version and build number, macOS version and architecture, selected
+Include the affected Rei version and build number, macOS version and architecture, selected
 protocol and transport, exposure configuration, reproduction steps, realistic impact, and any
 suggested mitigation. Remove unrelated access tokens, message content, local file paths, and
 personal data. If a proof of concept needs sensitive data, share only the minimum necessary through
@@ -22,15 +22,15 @@ published version and `main` receive security fixes; older releases are not main
 
 ## System and Scope
 
-Matcha is a local macOS development tool that simulates a messaging platform for bot frameworks. It
+Rei is a local macOS development tool that simulates a messaging platform for bot frameworks. It
 accepts OneBot and Milky traffic, mutates locally persisted simulated state, reads or downloads
 operator- or peer-selected attachments, emits events to connected peers and WebHook destinations,
 and displays raw protocol traffic for debugging.
 
 This policy covers the application in `App/`, all modules in `Sources/`, the Xcode and SwiftPM build
 definitions, and the GitHub Actions release pipeline. Security defects in an external bot framework,
-adapter, Apple framework, or the original Vue/Tauri Matcha project are outside this repository unless
-Matcha violates one of the boundaries below.
+adapter, Apple framework, or the upstream Vue/Tauri project are outside this repository unless Rei
+violates one of the boundaries below.
 
 Important assets include access tokens, files readable by the current macOS user, simulated users,
 groups and messages, exported diagnostics, Developer ID and notarization credentials, and the
@@ -39,12 +39,12 @@ integrity of published release artifacts.
 ## Threat Model and Trust Boundaries
 
 - The local operator and processes already running as the same macOS user are trusted to configure
-  Matcha and access its local application data.
+  Rei and access its local application data.
 - Inbound HTTP and WebSocket peers are untrusted until they satisfy the configured access-token
   boundary. An authenticated peer is intentionally allowed to exercise the simulated platform's
   protocol capabilities, including attachment references.
 - The default listener address is loopback and the default access token is empty. Selecting a
-  routable listener address, port forwarding, or otherwise exposing Matcha beyond the local machine
+  routable listener address, port forwarding, or otherwise exposing Rei beyond the local machine
   is an explicit trust-boundary change and should be paired with a strong token and trusted network.
 - Outbound WebSocket peers and Milky WebHook destinations are selected by the operator. Their
   responses, timing, certificates, and availability remain untrusted.
@@ -75,7 +75,7 @@ integrity of published release artifacts.
 
 A finding is reportable when it crosses one of these boundaries with a realistic path in the
 supported configuration. Examples include authentication bypass, unauthorized local-file
-disclosure, credential leakage, attacker-controlled writes outside Matcha's storage, memory or CPU
+disclosure, credential leakage, attacker-controlled writes outside Rei's storage, memory or CPU
 exhaustion reachable from an exposed listener, code execution, or substitution of release source or
 artifacts.
 
@@ -88,7 +88,7 @@ without a confidentiality, integrity, availability, or supply-chain impact are o
 ## Out of Scope and Intended Behavior
 
 - A peer that possesses the configured token is intentionally trusted with the protocol operations
-  Matcha exposes. Reports must demonstrate an additional boundary violation rather than only that an
+  Rei exposes. Reports must demonstrate an additional boundary violation rather than only that an
   authorized framework can control the simulated platform.
 - Reading an operator-selected or authenticated-peer-selected absolute attachment path is part of
   the current simulation contract. Bypassing authentication to read a path, writing outside the

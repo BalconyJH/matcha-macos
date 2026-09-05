@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/BalconyJH/matcha-macos/security/advisories/new
+    url: https://github.com/BalconyJH/rei-macos/security/advisories/new
     about: Report vulnerabilities privately to the maintainers.
   - name: NoneBot adapter support
     url: https://github.com/nonebot/nonebot2/issues
